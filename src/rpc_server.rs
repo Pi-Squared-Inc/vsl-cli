@@ -1,5 +1,5 @@
-use crate::config::RpcServer;
-use crate::config::RpcServerLocal;
+use crate::configs::RpcServer;
+use crate::configs::RpcServerLocal;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -128,7 +128,12 @@ pub fn start_server(
         .args(args.clone())
         .stdout(Stdio::from(stdout_file))
         .stderr(Stdio::from(stderr_file))
-        .spawn()?;
+        .spawn()
+        .or(Err(anyhow::anyhow!(
+            "Failed to launch server {} in vsl directory: {}",
+            vsl_binary,
+            vsl_dir.to_str().unwrap_or("<unknown>")
+        )))?;
 
     let config = RpcServer {
         pid: child.id(),

@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use vsl_cli::commands::Commands;
-use vsl_cli::config::Config;
+use vsl_cli::configs::Configs;
 use vsl_cli::execute::execute_command;
 use vsl_cli::rpc_client::RpcClient;
 use vsl_utils::IdentifiableClaim as _;
@@ -40,7 +40,7 @@ fn test_endpoints() -> anyhow::Result<()> {
 }
 
 fn exec_command(comm: Commands) {
-    let mut config = Config::load_or_create(false).unwrap();
+    let mut config = Configs::new("tmp".to_string(), String::new(), false).unwrap();
     let mut client = RpcClient::new();
     // TODO: enable checks here. Currently the correct responses are not returned, so
     // checking has no sense.

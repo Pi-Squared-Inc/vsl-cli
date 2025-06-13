@@ -20,7 +20,7 @@ pub enum Commands {
     #[command(name = "claim:submit")]
     ClaimSubmit {
         /// the claim to be submitted
-        #[arg(help = "Request verification of a claim", long_help = CLAIM_SUBMIT_HELP)]
+        #[arg(help = "Request verification of a claim")]
         claim: String,
         /// the claim type
         #[arg(short = 't', long = "type", default_value = "")]
@@ -45,7 +45,7 @@ pub enum Commands {
     #[command(name = "claim:settle")]
     ClaimSettle {
         /// The claim to be settled
-        #[arg(help = "Submit a verified claim for validation only",  long_help = CLAIM_SETTLE_HELP)]
+        #[arg(help = "Submit a verified claim for validation only")]
         claim: String,
         /// Client address, to whom the claim is settled. By default the current account address is used.
         #[arg(short, long, default_value = None)]
@@ -90,7 +90,7 @@ pub enum Commands {
     #[command(name = "claim:get")]
     ClaimGet {
         /// JSON of the claim to query
-        #[arg(help = "Fetch a claim and its metadata by its ID", long_help = CLAIM_GET_HELP)]
+        #[arg(help = "Fetch a claim and its metadata by its ID")]
         id: String,
         /// URL to connect to, or name of a known network
         #[arg(short, long, default_value = None)]
@@ -362,66 +362,44 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         tmp_config: bool,
     },
+    /// Create a new configuration.
+    #[command(name = "config:create")]
+    ConfigCreate {
+        /// Name of the new configuration
+        name: String,
+        /// Copy data from a given configuration, if provided
+        #[arg(short, long, default_value = "")]
+        copy: String,
+        /// File path with will be used to store configuration. If not provided, the `.config/vsl/<name>.json` will be used.
+        #[arg(short, long, default_value = "")]
+        file: String,
+        /// Overwrite the existing configuration
+        #[arg(short, long, default_value_t = false)]
+        overwrite: bool,
+    },
+    /// Use a particular configuration.
+    #[command(name = "config:use")]
+    ConfigUse {
+        /// Name of the configuration to use
+        name: String,
+    },
+    /// Show a current configuration.
+    #[command(name = "config:current")]
+    ConfigCurrent {},
+    /// List all known configurations.
+    #[command(name = "config:list")]
+    ConfigList {
+        /// Display data in a json structure
+        #[arg(long, default_value_t = false, action = ArgAction::SetTrue)]
+        json: bool,
+        /// Display data in a table structure
+        #[arg(long, default_value_t = false, action = ArgAction::SetTrue)]
+        table: bool,
+    },
+    /// Remove an existing configuration.
+    #[command(name = "config:remove")]
+    ConfigRempove {
+        #[arg(help = "Name of the configuration, which is going to be removed")]
+        name: String,
+    },
 }
-
-const CLAIM_SETTLE_HELP: &str = r#"Submit a verified claim for validation only, as JSON.
-Request format:
-
-{
-  "claim": String,         // the verified claim
-  "certificate": {
-    "verifiers": [String], // a list verifiers who verified the claim
-    "signature": String,   // an aggregate signature of the verifiers' signatures
-  },
-  "nonce": String,         // the client nonce
-  "client": String,        // optionally, the client for whom the claim was originally verified
-}
-
-Response:
-
-{ claim_id: String }
-
-"#;
-
-const CLAIM_SUBMIT_HELP: &str = r#"Request verification of a claim as JSON.
-Request format:
-
-{
-  "claim": String,       // the claim to be verified
-  "claim_type": String,  // the claim type
-  "proof": String,       // the proof of the claim
-  "nonce": String,       // the client nonce
-  "verifiers": [String], // the list of verifiers
-  "quorum": Int,         // the minimum quorum of signatures
-  "client": String,      // the client account requesting verification
-  "expires": Int,        // the time after which the claim is dropped if not enough verifications are received
-  "fee": Int             // the verification fee
-}
-
-Response:
-
-{ claim_id: String }
-
-"#;
-
-const CLAIM_GET_HELP: &str = r#"Fetch a claim and its metadata by its ID
-Request:
-
-{ claim_id: String }
-
-Response:
-
-{
-   "timestamp": Int,
-   "claim": {
-        "claim": String,           // the verified claim
-        "signatures": {
-            "verifiers": [String], // a list verifiers who verified the claim
-            "signature": String    // an aggregate signature of the verifiers' signatures
-        }
-        "nonce": String,           // the client nonce
-        "client": String           // optionally, the client
-   },
-}
-
-"#;

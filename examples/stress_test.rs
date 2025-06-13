@@ -8,9 +8,11 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 use vsl_cli::commands::Commands;
-use vsl_cli::config::Config;
-use vsl_cli::config::RpcServer;
-use vsl_cli::config::vsl_directory;
+use vsl_cli::configs::Config;
+use vsl_cli::configs::Configs;
+use vsl_cli::configs::RpcServer;
+use vsl_cli::configs::VSL_TMP_CONFIG;
+use vsl_cli::configs::vsl_directory;
 use vsl_cli::execute::execute_command;
 use vsl_cli::execute::launch_server;
 use vsl_cli::networks::Network;
@@ -318,7 +320,7 @@ fn execute_single_request(
 }
 
 fn check_server(verbosity: u32) -> Result<()> {
-    let mut config = Config::new(false);
+    let mut config = Configs::new(VSL_TMP_CONFIG.to_string(), String::new(), false)?;
     let mut client = RpcClient::new();
     let network = config.get_network(None).unwrap_or(Network::default());
     if verbosity > 1 {
@@ -573,7 +575,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             timeout_seconds: 30,
             verbosity: verbosity,
         };
-        let mut config = Config::new(false);
+        let mut config = Configs::new(VSL_TMP_CONFIG.to_string(), String::new(), false)?;
         let mut server = launch_server(
             &mut config,
             "tmp".to_string(),

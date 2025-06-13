@@ -2,7 +2,7 @@
 
 pub mod accounts;
 pub mod commands;
-pub mod config;
+pub mod configs;
 pub mod execute;
 pub mod networks;
 pub mod rpc_client;

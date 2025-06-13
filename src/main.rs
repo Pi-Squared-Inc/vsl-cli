@@ -2,7 +2,7 @@
 
 mod accounts;
 mod commands;
-mod config;
+mod configs;
 mod execute;
 mod networks;
 mod rpc_client;
@@ -13,8 +13,9 @@ use clap::CommandFactory;
 use clap::Parser;
 use commands::Cli;
 use commands::Commands;
-use config::Config;
-use config::RpcServer;
+use configs::Config;
+use configs::Configs;
+use configs::RpcServer;
 use execute::execute_command;
 use rpc_client::RpcClient;
 use rpc_client::RpcClientError;
@@ -158,7 +159,7 @@ fn run_repl_loop(
     rl.set_helper(Some(helper));
 
     // Load history
-    let history_file = config::vsl_config_dir()?.join("cli_history");
+    let history_file = configs::vsl_config_dir()?.join("cli_history");
     if history_file.exists() {
         if let Err(e) = rl.load_history(&history_file) {
             println!("Warning: Could not load history: {}", e);
@@ -169,7 +170,9 @@ fn run_repl_loop(
         match rl.readline("vsl> ") {
             Ok(input) => {
                 let input = input.trim();
-                if print_commands || std::env::var("VSL_CLI_PRINT_COMMANDS").is_ok() {
+                if print_commands
+                    || std::env::var("VSL_CLI_PRINT_COMMANDS").unwrap_or(String::new()) == "1"
+                {
                     println!("vsl> {}", input);
                 }
                 if input.is_empty() || input.to_string().starts_with("#") {
@@ -266,8 +269,8 @@ fn output_result(result: &anyhow::Result<Value, RpcClientError>) {
     }
 }
 
-fn make_config(persistent: bool) -> Result<Config> {
-    let mut config = Config::load_or_create(persistent)?;
+fn make_config() -> Result<Config> {
+    let mut config = Configs::load(None)?;
     match config.get_server() {
         Some(server) => {
             // In case server is not running - remove it
@@ -294,19 +297,20 @@ fn main() -> Result<()> {
     // Create the client connection
     let mut rpc_client = RpcClient::new();
 
+    // Load the existing config
+    let mut config = make_config()?;
+
     match cli.command {
         Commands::Repl {
             print_commands,
             tmp_config,
         } => {
-            // Load the existing config or create a new one
-            let mut config = make_config(!tmp_config)?;
-
             run_repl_loop(&mut config, &mut rpc_client, print_commands);
         }
         _ => {
-            // Load the existing config or create a new one
-            let mut config = make_config(true)?;
+            if std::env::var("VSL_CLI_PRINT_COMMANDS").unwrap_or(String::new()) == "1" {
+                println!("{}", std::env::args().collect::<Vec<String>>().join(" "));
+            }
             output_result(&execute_command(&mut config, &cli.command, &mut rpc_client))
         }
     }

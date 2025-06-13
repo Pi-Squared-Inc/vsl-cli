@@ -1,9 +1,10 @@
 #![allow(unused)]
 
 use crate::commands::Commands;
-use crate::config::Config;
-use crate::config::RpcServer;
-use crate::config::vsl_directory;
+use crate::configs::Config;
+use crate::configs::Configs;
+use crate::configs::RpcServer;
+use crate::configs::vsl_directory;
 use crate::networks::Network;
 use crate::rpc_client::RpcClientError;
 use crate::rpc_client::RpcClientInterface;
@@ -749,11 +750,6 @@ pub fn execute_command<T: RpcClientInterface>(
                 Ok(Value::String("Local RPC server is already up".to_string()))
             } else {
                 info!("starting vsl-core (server)...");
-                if db == "tmp" {
-                    // When a temporary DB is used it makes no sence to use a normal config
-                    // - the config copy with `persistent` false is used.
-                    config.store_state()?;
-                }
                 let new_server = launch_server(
                     config,
                     db.clone(),
@@ -797,19 +793,6 @@ pub fn execute_command<T: RpcClientInterface>(
                 stop_server(&server).map_err(|e| {
                     RpcClientError::GeneralError(format!("Failed to stop process: {}", e))
                 })?;
-                match &config.server {
-                    Some(server) => match &server.local {
-                        Some(local) => {
-                            if local.db_dir.ends_with("tmp") {
-                                // When stopping a server with `--db=tmp` we may restore the original
-                                // state of a config, which was before starting a server.
-                                config.restore_state()?;
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
                 config.set_server(None);
                 Ok(Value::String("Local RPC server is stopped".to_string()))
             }
@@ -821,6 +804,85 @@ pub fn execute_command<T: RpcClientInterface>(
         } => Err(RpcClientError::GeneralError(
             "Cannot start REPL from within REPL".to_string(),
         )),
+        Commands::ConfigCreate {
+            name,
+            copy,
+            file,
+            overwrite,
+        } => {
+            let mut new_config = Configs::new(name.clone(), file.clone(), *overwrite)?;
+            if copy != "" {
+                let old_config = Configs::load(Some(copy.clone()))?;
+                new_config = old_config;
+            }
+            Ok(Value::String(format!(
+                "The configuration {} is created",
+                name
+            )))
+        }
+        Commands::ConfigUse { name } => {
+            *config = Configs::load(Some(name.clone()))?;
+            Configs::use_(name.clone());
+            Ok(Value::String(format!("Using configuration {}", name)))
+        }
+        Commands::ConfigCurrent {} => {
+            let configs = Configs::read()?;
+            match configs.current {
+                Some(current) => {
+                    let path =
+                        configs
+                            .configs
+                            .get(&current)
+                            .ok_or(RpcClientError::GeneralError(format!(
+                                "Config '{}' has no corresponding path",
+                                current
+                            )))?;
+                    Ok(Value::String(format!(
+                        "Current configuration: {} at {}",
+                        current,
+                        path.to_str().unwrap_or("?")
+                    )))
+                }
+                None => Ok(Value::String(format!("No active current configuration"))),
+            }
+        }
+        Commands::ConfigList { json, table } => {
+            if *json && *table {
+                Err(RpcClientError::GeneralError(
+                    "--table= cannot also be provided when using --json=".to_string(),
+                ))
+            } else {
+                let configs = Configs::read()?;
+                if *json {
+                    let mut json_map = serde_json::Map::new();
+                    for (name, path) in configs.configs {
+                        json_map.insert(
+                            name.clone(),
+                            json!({
+                                "name": name,
+                                "path": path.to_str().unwrap_or("?")
+                            }),
+                        );
+                    }
+                    Ok(Value::Object(json_map))
+                } else {
+                    let mut lines = Vec::new();
+                    lines.push(String::from("Available configurations:"));
+                    if configs.configs.is_empty() {
+                        lines.push(String::from("   No configurations are present."));
+                    } else {
+                        for (name, path) in configs.configs {
+                            lines.push(format!("  {} at {}", name, path.to_str().unwrap_or("?")));
+                        }
+                    }
+                    Ok(Value::String(lines.join("\n")))
+                }
+            }
+        }
+        Commands::ConfigRempove { name } => {
+            Configs::remove(name.clone())?;
+            Ok(Value::String(format!("Configuration {} was removed", name)))
+        }
     }
 }
 
