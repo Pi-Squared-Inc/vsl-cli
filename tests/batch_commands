@@ -2,9 +2,14 @@ network:list
 network:current
 # Stop a probably running local RPC server
 server:stop
+
+config:create local_test --overwrite
+
 # Start a fresh new one
 server:launch --db=tmp --master-balance=1000000
+account:current
 account:balance
+account:export
 network:list
 network:current
 
@@ -13,11 +18,26 @@ health:check
 account:list
 
 account:create acc1
+account:use master
+pay --to acc1 --amount 1000
+account:use acc1
 account:balance
+account:export
+
 account:create acc2
+account:use master
+pay --to acc2 --amount 1000
+account:use acc2
 account:balance
+account:export
+
 account:create acc3
+account:use master
+pay --to acc3 --amount 1000
+account:use acc3
 account:balance
+account:export
+
 account:remove acc3
 account:use acc2
 
@@ -135,3 +155,5 @@ claim:submitted
 health:check
 # Stop the test local RPC server
 server:stop
+
+config:remove local_test

@@ -300,33 +300,40 @@ pub fn execute_command<T: RpcClientInterface>(
                 ))),
             }
         }
-        Commands::AccountCreate {
-            network,
+        Commands::AccountCreate { name, overwrite } => {
+            let credentials = config.generate_credentials(None)?;
+            let new_account = config.create_account(name.clone(), credentials, *overwrite)?;
+            config.use_account(&new_account.name);
+            Ok(Value::String(format!(
+                "Account {} is created, address: {}",
+                name, new_account.credentials.address
+            )))
+        }
+        Commands::AccountLoad {
             name,
-            master,
-            balance,
             private_key,
             overwrite,
         } => {
             let credentials = config.generate_credentials(private_key.clone())?;
-            config.use_account(&master.clone());
-            let pay_command = Commands::Pay {
-                network: network.clone(),
-                to: credentials.address.clone(),
-                amount: to_hex(balance)?,
-            };
-            let response = execute_command(config, &pay_command, rpc_client)?;
-            match &response {
-                Value::String(tx) => {
-                    let new_account =
-                        config.create_account(name.clone(), credentials, *overwrite)?;
-                    config.use_account(&new_account.name);
-                    Ok(response)
-                }
-                _ => Err(RpcClientError::GeneralError(format!(
-                    "Failed to create account: '{}'",
-                    response
-                ))),
+            let new_account = config.create_account(name.clone(), credentials, *overwrite)?;
+            config.use_account(&new_account.name);
+            Ok(Value::String(format!("Account {} is loaded", name)))
+        }
+        Commands::AccountExport { name, file } => {
+            let account = config.get_account(if name != "" { Some(&name) } else { None })?;
+            if file == "" {
+                Ok(Value::String(account.credentials.private_key.clone()))
+            } else {
+                std::fs::write(file, account.credentials.private_key.clone()).map_err(|err| {
+                    RpcClientError::GeneralError(format!(
+                        "Failed to save the private key to the file: '{}'",
+                        file
+                    ))
+                })?;
+                Ok(Value::String(format!(
+                    "Account private key is exported to file {}",
+                    file
+                )))
             }
         }
         Commands::AccountGet { network, account } => {

@@ -70,12 +70,9 @@ fn create_accounts(
     let mut success = true;
     let mut configs = Vec::new();
     for n in 0..stress_config.max_concurrent {
+        let acc_name = format!("acc_{}", n);
         let create_account_comm = Commands::AccountCreate {
-            network: None,
-            name: format!("acc_{}", n),
-            master: "master".to_string(),
-            balance: "0x1000".to_string(),
-            private_key: None,
+            name: acc_name.clone(),
             overwrite: true,
         };
         let create_acc_response = execute_single_request(config, &create_account_comm, &mut client);
@@ -87,44 +84,58 @@ fn create_accounts(
         if create_acc_response.success {
             match create_acc_response.value {
                 Value::String(ref account_id) => {
-                    let balance_comm = Commands::AccountBalance {
+                    let supply_account_comm = Commands::Pay {
                         network: None,
-                        account: None,
+                        to: address.clone(),
+                        amount: "0x1000".to_string(),
                     };
-                    let balance_response =
-                        execute_single_request(config, &balance_comm, &mut client);
-                    let balance = match balance_response.value {
-                        Value::String(ref balance) => balance.clone(),
-                        _ => {
-                            return Err(anyhow::anyhow!("{}Failed to get balance", indent.clone()));
+                    config.use_account("master");
+                    let supply_account_response =
+                        execute_single_request(config, &supply_account_comm, &mut client);
+                    if supply_account_response.success {
+                        config.use_account(&acc_name);
+                        let balance_comm = Commands::AccountBalance {
+                            network: None,
+                            account: None,
+                        };
+                        let balance_response =
+                            execute_single_request(config, &balance_comm, &mut client);
+                        let balance = match balance_response.value {
+                            Value::String(ref balance) => balance.clone(),
+                            _ => {
+                                return Err(anyhow::anyhow!(
+                                    "{}Failed to get balance",
+                                    indent.clone()
+                                ));
+                            }
+                        };
+                        let master_balance_comm = Commands::AccountBalance {
+                            network: None,
+                            account: Some("master".to_string()),
+                        };
+                        let master_balance_response =
+                            execute_single_request(config, &master_balance_comm, &mut client);
+                        let master_balance = match master_balance_response.value {
+                            Value::String(ref balance) => balance.clone(),
+                            _ => {
+                                return Err(anyhow::anyhow!(
+                                    "{}Failed to get master balance",
+                                    indent.clone()
+                                ));
+                            }
+                        };
+                        if stress_config.verbosity > 1 {
+                            println!(
+                                "{}  Account: acc_{}(address: {}) balance: {}, master balance: {}",
+                                indent.clone(),
+                                n,
+                                address,
+                                balance,
+                                master_balance
+                            );
                         }
-                    };
-                    let master_balance_comm = Commands::AccountBalance {
-                        network: None,
-                        account: Some("master".to_string()),
-                    };
-                    let master_balance_response =
-                        execute_single_request(config, &master_balance_comm, &mut client);
-                    let master_balance = match master_balance_response.value {
-                        Value::String(ref balance) => balance.clone(),
-                        _ => {
-                            return Err(anyhow::anyhow!(
-                                "{}Failed to get master balance",
-                                indent.clone()
-                            ));
-                        }
-                    };
-                    if stress_config.verbosity > 1 {
-                        println!(
-                            "{}  Account: acc_{}(address: {}) balance: {}, master balance: {}",
-                            indent.clone(),
-                            n,
-                            address,
-                            balance,
-                            master_balance
-                        );
+                        configs.push(config.clone());
                     }
-                    configs.push(config.clone());
                 }
                 _ => {
                     success = false;

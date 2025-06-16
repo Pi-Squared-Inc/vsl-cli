@@ -117,21 +117,31 @@ pub enum Commands {
     AccountCreate {
         /// Account name
         name: String,
-        /// Master account, who is responsible for supplying the initial balance
-        #[arg(short, long, default_value = "master")]
-        master: String,
-        /// Initial balance (in case set, is payed by a master account)
-        #[arg(short, long, default_value = "0x1000")]
-        balance: String,
-        /// Account private key. Optional. If not provided, a new private key is generated.
+        /// Overwrite the existing account
+        #[arg(short, long, default_value_t = false)]
+        overwrite: bool,
+    },
+    /// Makes use of an existing account with a provided private key.
+    #[command(name = "account:load")]
+    AccountLoad {
+        /// Account name
+        name: String,
+        /// Account private key. May be a private key itself, or a path to a file with private key.
         #[arg(short, long, default_value = None)]
         private_key: Option<String>,
         /// Overwrite the existing account
         #[arg(short, long, default_value_t = false)]
         overwrite: bool,
-        /// URL to connect to, or name of a known network
-        #[arg(short, long, default_value = None)]
-        network: Option<String>,
+    },
+    /// Exports the accounts private key.
+    #[command(name = "account:export")]
+    AccountExport {
+        /// Account name, optional. If ommited, the current is exported.
+        #[arg(short, long, default_value = "")]
+        name: String,
+        /// The target file, where the private key would be written, optional. Otherwise, the private key will be shown in console.
+        #[arg(short, long, default_value = "")]
+        file: String,
     },
     /// Fetches the information about account.
     #[command(name = "account:get")]
