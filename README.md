@@ -126,7 +126,7 @@ vsl-cli server:dump                    # View server logs
 ### 🔍 Monitoring
 ```bash
 vsl-cli health:check                   # Check network health
-vsl-cli repl                          # Interactive mode
+vsl-cli repl                           # Interactive mode
 ```
 
 ## Configuration
@@ -507,7 +507,6 @@ Best RPS: 10191.9 at concurrency 32
 ## Community
 
 - **Discord**: [Join our community](https://discord.gg/pisquared)
-- **Slack**:   [#devnet-site-planning](https://pi-squared-workspace.slack.com/archives/C08QS5R62JE)
 - **Twitter**: [@PiSquaredNetwork](https://x.com/Pi_Squared_Pi2)
 
 ## License

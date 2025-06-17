@@ -66,9 +66,10 @@ vsl claim:submitted [OPTIONS]
 - `-w, --within <WITHIN>` - Within a certain number seconds before now (default: 3600 - 1 hour)
 - `-n, --network <NETWORK>` - URL to connect to, or name of a known network
 
-**Example:**
+**Examples:**
 ```bash
-vsl claim:submitted --since 1640995200 --within 7200
+vsl claim:submitted --since 1640995200
+vsl claim:submitted --within 7200
 ```
 
 #### `claim:settled`
@@ -288,7 +289,7 @@ vsl account:current [OPTIONS]
 
 **Options:**
 - `--json` - Display data in a json structure (default: false)
-- `--table` - Display data in a table structure (default: false)
+- `--table` - Display data in a table structure (default: true)
 
 **Example:**
 ```bash
@@ -305,7 +306,7 @@ vsl account:list [OPTIONS]
 
 **Options:**
 - `--json` - Display data in a json structure (default: false)
-- `--table` - Display data in a table structure (default: false)
+- `--table` - Display data in a table structure (default: true)
 
 **Example:**
 ```bash
@@ -473,7 +474,7 @@ vsl network:list [OPTIONS]
 
 **Options:**
 - `--json` - Display data in a json structure (default: false)
-- `--table` - Display data in a table structure (default: false)
+- `--table` - Display data in a table structure (default: true)
 
 **Example:**
 ```bash
@@ -506,7 +507,7 @@ vsl network:current [OPTIONS]
 
 **Options:**
 - `--json` - Display data in a json structure (default: false)
-- `--table` - Display data in a table structure (default: false)
+- `--table` - Display data in a table structure (default: true)
 
 **Example:**
 ```bash
@@ -525,8 +526,8 @@ vsl network:update <name> [OPTIONS]
 - `<name>` - Name of the network to update. Default is the currently used network (required)
 
 **Options:**
-- `-u, --url <URL>` - Network URL (default: uses VSL_CLI_DEFAULT_NETWORK_URL)
-- `-p, --port <PORT>` - Network port (default: uses VSL_CLI_DEFAULT_NETWORK_PORT)
+- `-u, --url <URL>` - Network URL (default: http://localhost)
+- `-p, --port <PORT>` - Network port (default: 44444)
 
 **Example:**
 ```bash
@@ -660,7 +661,7 @@ vsl config:list [OPTIONS]
 
 **Options:**
 - `--json` - Display data in a json structure (default: false)
-- `--table` - Display data in a table structure (default: false)
+- `--table` - Display data in a table structure (default: true)
 
 **Example:**
 ```bash
