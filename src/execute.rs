@@ -19,6 +19,7 @@ use linera_base::data_types::Amount;
 use log::info;
 use serde_json::Value;
 use serde_json::json;
+use tempfile::TempDir;
 use vsl_sdk::IntoSigned as _;
 use vsl_sdk::Timestamp;
 use vsl_sdk::rpc_messages::CreateAssetMessage;
@@ -740,7 +741,7 @@ pub fn execute_command<T: RpcClientInterface>(
                 Ok(Value::String("Local RPC server is already up".to_string()))
             } else {
                 info!("starting vsl-core (server)...");
-                let new_server = launch_server(
+                let (new_server, opt_tempdir) = launch_server(
                     config,
                     db.clone(),
                     log_level.clone(),
@@ -751,10 +752,18 @@ pub fn execute_command<T: RpcClientInterface>(
                 if check_network_is_up(rpc_client, local_network) {
                     let proc_id = new_server.pid;
                     config.set_server(Some(new_server));
-                    Ok(Value::String(format!(
-                        "Local RPC server is spawned, process id: {}",
-                        proc_id
-                    )))
+                    if let Some(tempdir) = opt_tempdir {
+                        Ok(Value::String(format!(
+                            "Local RPC server is spawned, process id: {} created temp db directory: {}",
+                            proc_id,
+                            tempdir.keep().display()
+                        )))
+                    } else {
+                        Ok(Value::String(format!(
+                            "Local RPC server is spawned, process id: {}",
+                            proc_id
+                        )))
+                    }
                 } else {
                     Err(RpcClientError::GeneralError(format!(
                         "Failed to start PRC local server, proc id: {:?}",
@@ -883,7 +892,7 @@ pub fn launch_server(
     log_level: String,
     master_account: String,
     master_balance: String,
-) -> Result<RpcServer, RpcClientError> {
+) -> Result<(RpcServer, Option<TempDir>), RpcClientError> {
     let init_account = if master_balance != "" {
         match config.get_account(Some(&master_account)) {
             Ok(account) => {
@@ -903,7 +912,7 @@ pub fn launch_server(
     } else {
         None
     };
-    let new_server: RpcServer =
+    let new_server: (RpcServer, Option<TempDir>) =
         start_server(vsl_directory()?, &db, log_level.clone(), init_account)?;
     Ok(new_server)
 }

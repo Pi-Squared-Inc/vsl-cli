@@ -31,14 +31,38 @@ fn test_cli_end_to_end() {
     println!("cli stdout:\n{}", stdout);
     println!("");
 
+    if !output.status.success() {
+        eprintln!("cli stdout:\n{}", stdout);
+        panic!("`vsl-cli` process failed with status: {}", output.status);
+    }
+
     let err_predicate =
         |line: &str| line.contains(error_prefix) && !line.contains("Endpoint not yet implemented");
 
     let mut errors = Vec::new();
+
+    // Once one of these linse is not present - that's a sign of an error.
+    for must_have in vec![
+        "Welcome to vsl-cli REPL.",
+        "The configuration local_test is created",
+        "Local RPC server is spawned, process id:",
+        "vsl> health:check\nok",
+        "Available networks:\n  default - http://localhost:44444 -- up",
+        "Account acc1 is created, address:",
+        "Account acc2 is created, address:",
+        "Local RPC server is stopped",
+        "Configuration local_test was removed",
+    ] {
+        if !stdout.contains(must_have) {
+            let err = format!("Error: must have line: '{}' is not present", must_have);
+            println!("{}", err);
+            errors.push(err);
+        }
+    }
     for line in stdout.split("\n") {
         if err_predicate(line) {
             println!("Error: {}", line);
-            errors.push(line);
+            errors.push(line.to_string());
         }
     }
     if errors.len() > 0 {

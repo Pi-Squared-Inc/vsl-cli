@@ -587,7 +587,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             verbosity: verbosity,
         };
         let mut config = Configs::new(VSL_TMP_CONFIG.to_string(), String::new(), false)?;
-        let mut server = launch_server(
+        let (mut server, _tempdir) = launch_server(
             &mut config,
             "tmp".to_string(),
             "info".to_string(),

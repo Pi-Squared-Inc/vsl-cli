@@ -98,6 +98,10 @@ impl Configs {
     fn save(configs: &Configs) -> Result<()> {
         let config_dir = vsl_config_dir()?;
         let path = config_dir.join("configs.json");
+        // Make sure parent directories exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).context("Failed to create config directory")?;
+        }
         // Serialize the config to JSON
         let json = serde_json::to_string_pretty(configs).context("Failed to serialize configs")?;
 
@@ -499,7 +503,13 @@ impl HexMap {
 /// The directory of persistent storage of `vsl-cli` application.
 pub fn vsl_config_dir() -> Result<PathBuf> {
     match config_dir() {
-        Some(dir) => Ok(dir.join("vsl")),
+        Some(dir) => {
+            let path = dir.join("vsl");
+            if !path.exists() {
+                fs::create_dir_all(&path)?;
+            }
+            Ok(path)
+        }
         None => Err(anyhow::anyhow!("vsl config directory is not found")),
     }
 }

@@ -10,17 +10,19 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::SystemTime;
+use tempfile::TempDir;
 
 /// Starts the server in a separate child process.
 /// - vls_dir: the directory of the VSL repository/distribution
 /// - db_path: path to the VSL storage directory
 /// - log_level: one of RUST_LOG values - info, warn, error, etc....
+#[must_use]
 pub fn start_server(
     vsl_dir: PathBuf,
     db: &String,
     log_level: String,
     maybe_master_account: Option<InitAccount>,
-) -> Result<RpcServer> {
+) -> Result<(RpcServer, Option<TempDir>)> {
     let mut claim_db_path = String::new();
     let mut tokens_db_path = String::new();
     let mut use_genesis = false;
@@ -33,7 +35,7 @@ pub fn start_server(
             ));
         }
         // Create temporary directories for DB and tokens
-        let temp_dir = tempfile::TempDir::new().map_err(|err| {
+        let temp_dir = tempfile::TempDir::with_prefix("vsl-").map_err(|err| {
             anyhow::anyhow!(format!("Failed to create temporary directory: {}", err))
         })?;
         log::info!(
@@ -161,7 +163,7 @@ pub fn start_server(
     } else {
         // Don't wait for the child - let it run in background
         std::mem::forget(child);
-        Ok(config)
+        Ok((config, tempdir))
     }
 }
 
@@ -227,20 +229,34 @@ pub fn check_server_is_alive(server: &RpcServer) -> bool {
     }
 }
 
-pub fn find_server_by_netstat() -> Result<Option<u32>> {
+pub fn try_to_find_server() -> Option<u32> {
+    // Try netstat first
+    if let Some(pid) = try_netstat() {
+        return Some(pid);
+    }
+    // If netstat failed and we're on Linux, try ss
+    if cfg!(target_os = "linux") {
+        if let Some(pid) = try_ss() {
+            return Some(pid);
+        }
+    }
+    None
+}
+
+fn try_netstat() -> Option<u32> {
     let output = if cfg!(target_os = "windows") {
-        Command::new("netstat").args(["-ano"]).output()?
+        Command::new("netstat").args(["-ano"]).output().ok()?
     } else {
-        Command::new("netstat").args(["-tlnp"]).output()?
+        Command::new("netstat").args(["-tlnp"]).output().ok()?
     };
-    let stdout = String::from_utf8(output.stdout)?;
+    let stdout = String::from_utf8(output.stdout).ok()?;
     for line in stdout.lines() {
         if line.contains(&format!(":{}", VSL_CLI_DEFAULT_NETWORK_PORT)) {
             if cfg!(target_os = "windows") {
                 // Windows netstat format: TCP    0.0.0.0:8080    0.0.0.0:0    LISTENING    1234
                 if let Some(pid_str) = line.split_whitespace().last() {
                     if let Ok(pid) = pid_str.parse::<u32>() {
-                        return Ok(Some(pid));
+                        return Some(pid);
                     }
                 }
             } else {
@@ -248,12 +264,38 @@ pub fn find_server_by_netstat() -> Result<Option<u32>> {
                 if let Some(last_part) = line.split_whitespace().last() {
                     if let Some(pid_str) = last_part.split('/').next() {
                         if let Ok(pid) = pid_str.parse::<u32>() {
-                            return Ok(Some(pid));
+                            return Some(pid);
                         }
                     }
                 }
             }
         }
     }
-    Ok(None)
+
+    None
+}
+
+fn try_ss() -> Option<u32> {
+    // ss command with -tlnp flags: -t (TCP), -l (listening), -n (numeric), -p (process info)
+    let output = Command::new("ss").args(["-tlnp"]).output().ok()?;
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    for line in stdout.lines() {
+        if line.contains(&format!(":{}", VSL_CLI_DEFAULT_NETWORK_PORT)) {
+            // ss format: LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:(("program",pid=1234,fd=3))
+            // Look for users:((program,pid=NUMBER,fd=N))
+            if let Some(users_part) = line.split("users:((").nth(1) {
+                if let Some(process_info) = users_part.split("))").next() {
+                    // Extract pid from format like "program",pid=1234,fd=3
+                    for part in process_info.split(',') {
+                        if part.starts_with("pid=") {
+                            if let Ok(pid) = part[4..].parse::<u32>() {
+                                return Some(pid);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }

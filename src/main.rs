@@ -8,6 +8,7 @@ mod networks;
 mod rpc_client;
 mod rpc_server;
 
+use anyhow::Context;
 use anyhow::Result;
 use clap::CommandFactory;
 use clap::Parser;
@@ -20,7 +21,7 @@ use execute::execute_command;
 use rpc_client::RpcClient;
 use rpc_client::RpcClientError;
 use rpc_server::check_server_is_alive;
-use rpc_server::find_server_by_netstat;
+use rpc_server::try_to_find_server;
 use rustyline::ColorMode;
 use rustyline::Result as RustyResult;
 use rustyline::error::ReadlineError;
@@ -270,20 +271,24 @@ fn output_result(result: &anyhow::Result<Value, RpcClientError>) {
 }
 
 fn make_config() -> Result<Config> {
-    let mut config = Configs::load(None)?;
+    let mut config = Configs::load(None).context("Failed to load a current config")?;
     match config.get_server() {
         Some(server) => {
             // In case server is not running - remove it
             if !check_server_is_alive(&server) {
                 config.set_server(None);
-                match find_server_by_netstat()? {
-                    Some(pid) => config.set_server(Some(RpcServer { pid, local: None }))?,
+                match try_to_find_server() {
+                    Some(pid) => config
+                        .set_server(Some(RpcServer { pid, local: None }))
+                        .context("Failed to set server")?,
                     None => {}
                 }
             }
         }
-        None => match find_server_by_netstat()? {
-            Some(pid) => config.set_server(Some(RpcServer { pid, local: None }))?,
+        None => match try_to_find_server() {
+            Some(pid) => config
+                .set_server(Some(RpcServer { pid, local: None }))
+                .context("Failed to set server")?,
             None => {}
         },
     }
