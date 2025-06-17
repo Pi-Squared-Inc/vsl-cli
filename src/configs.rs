@@ -19,7 +19,7 @@ use std::io::Write;
 use std::io::{self};
 use std::path::PathBuf;
 use std::time::SystemTime;
-use vsl_utils::SubmittedClaim;
+use vsl_sdk::rpc_messages::SubmittedClaim;
 
 pub const VSL_TMP_CONFIG: &str = "tmp";
 

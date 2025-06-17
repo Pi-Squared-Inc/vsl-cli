@@ -4,7 +4,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt;
-use vsl_utils::PORT;
 
 /// The simple representation of a URL
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,7 +14,7 @@ pub struct Network {
 }
 
 pub const VSL_CLI_DEFAULT_NETWORK_URL: &str = "http://localhost";
-pub const VSL_CLI_DEFAULT_NETWORK_PORT: u32 = PORT;
+pub const VSL_CLI_DEFAULT_NETWORK_PORT: u32 = 44444;
 
 impl Default for Network {
     fn default() -> Self {

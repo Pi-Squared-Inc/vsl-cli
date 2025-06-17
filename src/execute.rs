@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use crate::accounts::private_key_to_signer;
 use crate::commands::Commands;
 use crate::configs::Config;
 use crate::configs::Configs;
@@ -18,18 +19,19 @@ use linera_base::data_types::Amount;
 use log::info;
 use serde_json::Value;
 use serde_json::json;
-use vsl_utils::CreateAssetMessage;
-use vsl_utils::IdentifiableClaim as _;
-use vsl_utils::InitAccount;
-use vsl_utils::IntoSigned;
-use vsl_utils::PayMessage;
-use vsl_utils::SetStateMessage;
-use vsl_utils::SettleClaimMessage;
-use vsl_utils::SubmittedClaim;
-use vsl_utils::Timestamp;
-use vsl_utils::TransferAssetMessage;
-use vsl_utils::VerifiedClaim;
-use vsl_utils::private_key_to_signer;
+use vsl_sdk::IntoSigned as _;
+use vsl_sdk::Timestamp;
+use vsl_sdk::rpc_messages::CreateAssetMessage;
+use vsl_sdk::rpc_messages::IdentifiableClaim;
+use vsl_sdk::rpc_messages::PayMessage;
+use vsl_sdk::rpc_messages::SetStateMessage;
+use vsl_sdk::rpc_messages::SettleClaimMessage;
+use vsl_sdk::rpc_messages::SettledVerifiedClaim;
+use vsl_sdk::rpc_messages::SubmittedClaim;
+use vsl_sdk::rpc_messages::Timestamped;
+use vsl_sdk::rpc_messages::TransferAssetMessage;
+use vsl_sdk::rpc_messages::ValidatorVerifiedClaim;
+use vsl_sdk::rpc_messages::VerifiedClaim;
 
 pub fn execute_command<T: RpcClientInterface>(
     config: &mut Config,
@@ -892,7 +894,7 @@ pub fn launch_server(
             Err(_) => {
                 let credentials = config.generate_credentials(None)?;
                 let account = config.create_account(master_account, credentials, false)?;
-                Some(InitAccount {
+                Some(crate::accounts::InitAccount {
                     account: account.credentials.address,
                     initial_balance: master_balance.clone(),
                 })

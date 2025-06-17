@@ -1,16 +1,13 @@
 #![allow(unused)]
 
+use alloy::hex::FromHex as _;
 use alloy::signers::k256::SecretKey;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
-use log::debug;
 use rand::thread_rng;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::env;
-use vsl_utils::private_key_to_public;
-use vsl_utils::private_key_to_signer;
 
 /// The primary data of an account: a private key and
 /// corresponding address.
@@ -34,6 +31,12 @@ pub struct Account {
     pub quorum: u16,
     /// The private key and address
     pub credentials: Credentials,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitAccount {
+    pub account: String,
+    pub initial_balance: String,
 }
 
 fn generate_private_key() -> String {
@@ -63,6 +66,12 @@ pub struct Accounts {
     accounts: HashMap<String, Account>,
     /// The default account name
     using: String,
+}
+
+pub fn private_key_to_signer(private_key: &str) -> PrivateKeySigner {
+    let bytes = <[u8; 32]>::from_hex(private_key).expect("Could not extract private key");
+    let secret_key = SecretKey::from_bytes(&bytes.into()).expect("could not parse private key");
+    PrivateKeySigner::from(secret_key)
 }
 
 impl Accounts {

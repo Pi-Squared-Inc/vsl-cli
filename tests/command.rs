@@ -4,8 +4,8 @@ use vsl_cli::commands::Commands;
 use vsl_cli::configs::Configs;
 use vsl_cli::execute::execute_command;
 use vsl_cli::rpc_client::RpcClient;
-use vsl_utils::IdentifiableClaim as _;
-use vsl_utils::VerifiedClaim;
+use vsl_sdk::rpc_messages::IdentifiableClaim as _;
+use vsl_sdk::rpc_messages::VerifiedClaim;
 
 const CLIENT: &str = "0xDB4a76394D34E39802ee169Ec9527b9223A16f0F";
 

@@ -4,12 +4,10 @@ use jsonrpsee::core::client::error::Error as ConnectionError;
 use jsonrpsee::core::params::ObjectParams;
 use serde_json::Value;
 use std::collections::HashMap;
-use vsl_cli::networks;
 use vsl_cli::networks::Network;
 use vsl_cli::networks::Networks;
 use vsl_cli::rpc_client::RpcClientError;
 use vsl_cli::rpc_client::RpcClientInterface;
-use vsl_utils::PORT;
 
 // Mock implementation for testing
 #[derive(Debug, Default)]

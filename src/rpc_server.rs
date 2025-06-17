@@ -1,6 +1,8 @@
 use crate::configs::RpcServer;
 use crate::configs::RpcServerLocal;
 
+use crate::accounts::InitAccount;
+use crate::networks::VSL_CLI_DEFAULT_NETWORK_PORT;
 use anyhow::Context;
 use anyhow::Result;
 use std::fs::OpenOptions;
@@ -8,8 +10,6 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::SystemTime;
-use vsl_utils::InitAccount;
-use vsl_utils::PORT;
 
 /// Starts the server in a separate child process.
 /// - vls_dir: the directory of the VSL repository/distribution
@@ -235,7 +235,7 @@ pub fn find_server_by_netstat() -> Result<Option<u32>> {
     };
     let stdout = String::from_utf8(output.stdout)?;
     for line in stdout.lines() {
-        if line.contains(&format!(":{}", PORT)) {
+        if line.contains(&format!(":{}", VSL_CLI_DEFAULT_NETWORK_PORT)) {
             if cfg!(target_os = "windows") {
                 // Windows netstat format: TCP    0.0.0.0:8080    0.0.0.0:0    LISTENING    1234
                 if let Some(pid_str) = line.split_whitespace().last() {
