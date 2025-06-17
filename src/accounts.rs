@@ -32,8 +32,6 @@ pub struct Account {
     pub signatures: Vec<String>,
     /// the minimum quorum of signatures
     pub quorum: u16,
-    /// The current nonce of account
-    pub nonce: u64,
     /// The private key and address
     pub credentials: Credentials,
 }
@@ -53,7 +51,6 @@ impl Account {
             name: name,
             signatures: verifiers,
             quorum: 1,
-            nonce: 0,
             credentials: credentials,
         }
     }
@@ -141,16 +138,6 @@ impl Accounts {
             .get(name)
             .ok_or(anyhow::anyhow!("account '{}' in not found", name))
             .cloned()
-    }
-    /// Increments the account `nonce` value
-    pub fn inc_nonce(&mut self, nm: Option<&str>) -> Result<()> {
-        let name = nm.unwrap_or(&self.using);
-        self.accounts
-            .get_mut(name)
-            .ok_or(anyhow::anyhow!("account '{}' in not found", name))
-            .map(|account| {
-                account.nonce += 1;
-            })
     }
     /// Sets the default account name.
     pub fn set_using(&mut self, name: &str) -> Result<()> {

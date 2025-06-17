@@ -331,10 +331,6 @@ impl Config {
     pub fn get_account(&mut self, name: Option<&str>) -> Result<Account> {
         self.accounts.get(name)
     }
-    /// Increments the account `nonce` value
-    pub fn inc_account_nonce(&mut self, name: Option<&str>) -> Result<()> {
-        self.accounts.inc_nonce(name).and_then(|_| self.save())
-    }
     /// Sets the default account name.
     pub fn use_account(&mut self, nm: &str) -> Result<()> {
         self.accounts.set_using(nm).and_then(|_| self.save())

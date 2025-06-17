@@ -30,6 +30,9 @@ impl MockRpcClient {
 }
 
 impl RpcClientInterface for MockRpcClient {
+    fn get_nonce(&mut self, network: Network, address: &str) -> Result<u64, RpcClientError> {
+        Ok(0)
+    }
     fn make_request(
         &mut self,
         network: Network,

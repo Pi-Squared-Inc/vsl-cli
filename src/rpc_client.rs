@@ -70,6 +70,7 @@ impl From<alloy::signers::Error> for RpcClientError {
 pub trait RpcClientInterface {
     fn close_connection(&mut self, network: &str);
     fn active_connection(&self) -> String;
+    fn get_nonce(&mut self, network: Network, address: &str) -> Result<u64, RpcClientError>;
     #[allow(async_fn_in_trait)]
     fn make_request(
         &mut self,
@@ -85,6 +86,23 @@ impl RpcClientInterface for RpcClient {
     }
     fn active_connection(&self) -> String {
         self.active.clone()
+    }
+    fn get_nonce(&mut self, network: Network, address: &str) -> Result<u64, RpcClientError> {
+        let mut params = ObjectParams::new();
+        params.insert("account_id", address)?;
+        let response = self.make_request(network, "vsl_getAccountNonce", params)?;
+        match &response {
+            Value::Number(num) => num
+                .as_u64()
+                .ok_or(RpcClientError::IncorrectResponse(format!(
+                    "must return an nonce integer value, got: {}",
+                    response
+                ))),
+            _ => Err(RpcClientError::IncorrectResponse(format!(
+                "must return an nonce integer value, got: {}",
+                response
+            ))),
+        }
     }
     fn make_request(
         &mut self,

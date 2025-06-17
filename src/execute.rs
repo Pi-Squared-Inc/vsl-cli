@@ -83,12 +83,14 @@ pub fn execute_command<T: RpcClientInterface>(
             }
             info!("Submitting claim json: '{}', fee: {}", claim, fee);
             let account = config.get_account(None)?;
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let expires = expires.unwrap_or(now + lifetime.unwrap());
             let to_submit: SubmittedClaim = SubmittedClaim {
                 claim: claim.clone(),
                 claim_type: claim_type.clone(),
                 proof: proof.clone(),
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
                 to: account.signatures.clone(),
                 quorum: account.quorum,
                 from: account.credentials.address,
@@ -100,14 +102,9 @@ pub fn execute_command<T: RpcClientInterface>(
                 .clone()
                 .into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             params.insert("claim", message_signed);
-            let response = rpc_client.make_request(
-                config.get_network(network.clone())?,
-                "vsl_submitClaim",
-                params,
-            )?;
+            let response = rpc_client.make_request(network, "vsl_submitClaim", params)?;
             match response {
                 Value::String(ref claim_id) => {
-                    config.inc_account_nonce(None)?;
                     config.add_claim(to_submit, claim_id.clone())?;
                     config.add_identifier(claim, claim_id.clone())?;
                     Ok(response)
@@ -129,26 +126,23 @@ pub fn execute_command<T: RpcClientInterface>(
                 Some(address) => config.lookup_address(address)?,
                 None => account.credentials.address.clone(),
             };
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &address)?;
             let submitted = config.get_claim(claim)?;
             let target_claim_id =
                 VerifiedClaim::claim_id_hash(&submitted.from, &submitted.nonce, &submitted.claim);
             let message = SettleClaimMessage {
                 from: address,
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
                 target_claim_id: target_claim_id.to_string(),
             };
             let message_signed =
                 message.into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             let mut params = ObjectParams::new();
             params.insert("settled_claim", message_signed);
-            let response = rpc_client.make_request(
-                config.get_network(network.clone())?,
-                "vsl_settleClaim",
-                params,
-            )?;
+            let response = rpc_client.make_request(network, "vsl_settleClaim", params)?;
             match response {
                 Value::String(ref claim_id) => {
-                    config.inc_account_nonce(None)?;
                     config.remove_claim(claim)?;
                     config.add_identifier(claim, claim_id.clone())?;
                     Ok(response)
@@ -277,23 +271,21 @@ pub fn execute_command<T: RpcClientInterface>(
         } => {
             info!("Making payment: to {} amount {}", to, amount);
             let account = config.get_account(None)?;
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let pay_message = PayMessage {
                 from: account.credentials.address,
                 to: config.lookup_address(&to)?,
                 amount: to_hex(amount)?,
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
             };
             let message_signed = pay_message
                 .into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             let mut params = ObjectParams::new();
             params.insert("payment", message_signed);
-            let response =
-                rpc_client.make_request(config.get_network(network.clone())?, "vsl_pay", params)?;
+            let response = rpc_client.make_request(network, "vsl_pay", params)?;
             match response {
-                Value::String(ref claim_id) => {
-                    config.inc_account_nonce(None)?;
-                    Ok(response)
-                }
+                Value::String(ref claim_id) => Ok(response),
                 _ => Err(RpcClientError::GeneralError(format!(
                     "Response to `pay` must be a claim_id (string), got: '{}'",
                     response
@@ -384,27 +376,24 @@ pub fn execute_command<T: RpcClientInterface>(
         } => {
             let account_name = account.as_deref();
             let account = config.get_account(account_name)?;
-            let account_id = &account.credentials.address;
-            info!("Setting state of account: '{}'", account_id);
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
+            info!(
+                "Setting state of account: '{}'",
+                account.credentials.address
+            );
             let message = SetStateMessage {
-                from: account_id.clone(),
+                from: account.credentials.address.clone(),
                 state: state.clone(),
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
             };
             let message_signed =
                 message.into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             let mut params = ObjectParams::new();
             params.insert("state", message_signed)?;
-            let response = rpc_client.make_request(
-                config.get_network(network.clone())?,
-                "vsl_setAccountState",
-                params,
-            )?;
+            let response = rpc_client.make_request(network, "vsl_setAccountState", params)?;
             match response {
-                Value::String(_) => {
-                    config.inc_account_nonce(account_name)?;
-                    Ok(response)
-                }
+                Value::String(_) => Ok(response),
                 _ => Err(RpcClientError::GeneralError(format!(
                     "Response to `vsl_setAccountState` must be settled claim id, got: '{}'",
                     response
@@ -526,9 +515,11 @@ pub fn execute_command<T: RpcClientInterface>(
             supply,
         } => {
             let account = config.get_account(None)?;
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let message = CreateAssetMessage {
                 account_id: account.credentials.address,
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
                 ticker_symbol: symbol.clone(),
                 total_supply: to_hex(supply)?,
             };
@@ -536,14 +527,9 @@ pub fn execute_command<T: RpcClientInterface>(
                 message.into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             let mut params = ObjectParams::new();
             params.insert("asset_data", message_signed);
-            let response = rpc_client.make_request(
-                config.get_network(network.clone())?,
-                "vsl_createAsset",
-                params,
-            )?;
+            let response = rpc_client.make_request(network, "vsl_createAsset", params)?;
             match response {
                 Value::String(ref asset_id) => {
-                    config.inc_account_nonce(None)?;
                     config.add_identifier(symbol, asset_id.clone())?;
                     Ok(response)
                 }
@@ -560,27 +546,22 @@ pub fn execute_command<T: RpcClientInterface>(
             amount,
         } => {
             let account = config.get_account(None)?;
+            let network = config.get_network(network.clone())?;
+            let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let message = TransferAssetMessage {
                 asset_id: config.lookup_identifier(asset)?,
                 from: account.credentials.address,
                 to: config.lookup_address(&to)?,
                 amount: to_hex(amount)?,
-                nonce: account.nonce.to_string(),
+                nonce: nonce.to_string(),
             };
             let message_signed =
                 message.into_signed(&private_key_to_signer(&account.credentials.private_key))?;
             let mut params = ObjectParams::new();
             params.insert("transfer_asset", message_signed);
-            let response = rpc_client.make_request(
-                config.get_network(network.clone())?,
-                "vsl_transferAsset",
-                params,
-            )?;
+            let response = rpc_client.make_request(network, "vsl_transferAsset", params)?;
             match response {
-                Value::String(ref claim_id) => {
-                    config.inc_account_nonce(None)?;
-                    Ok(response)
-                }
+                Value::String(ref claim_id) => Ok(response),
                 _ => Err(RpcClientError::GeneralError(format!(
                     "Response to `asset:transfer` must be a asset_id (string), got: '{}'",
                     response
