@@ -288,7 +288,7 @@ impl Config {
     }
     /// Change the current default network name.
     pub fn use_network(&mut self, name: String) -> Result<()> {
-        self.networks.set_using(name)
+        self.networks.set_using(name).and_then(|_| self.save())
     }
     /// Returns the current default network name.
     pub fn using_network(&self) -> String {
@@ -350,10 +350,14 @@ impl Config {
     }
 
     pub fn add_address(&mut self, name: &str, address: String) -> Result<()> {
-        self.addresses.add_id(name, address)
+        self.addresses
+            .add_id(name, address)
+            .and_then(|_| self.save())
     }
     pub fn add_identifier(&mut self, name: &str, address: String) -> Result<()> {
-        self.identifiers.add_id(name, address)
+        self.identifiers
+            .add_id(name, address)
+            .and_then(|_| self.save())
     }
     pub fn lookup_address(&mut self, name: &str) -> Result<String> {
         self.addresses.lookup_id(name)
