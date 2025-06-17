@@ -1,0 +1,132 @@
+# VSL CLI Tutorial
+
+# This tutorial walks you through using the `vsl-cli` to configure a network, manage accounts, create and # transfer assets, and submit a claim.
+
+# Run the tutorial by:
+# vsl-cli repl --print-commands < docs/tutorial.vsl
+
+## 🔌 Step 1: Connect to a Network
+# In case the VSL node is installed locally, start a local VSL node:
+
+server:launch --db tmp --master-balance 1000000000
+
+# Or use some external node, in case there's no local VSL node:
+# Uncomment these lines in case of remote network
+#network:add remote --url http://144.76.7.152
+#network:use remote
+
+
+# Verify connection:
+
+health:check
+
+
+## 👤 Step 2: Create and Use an Account
+
+# Create two accounts: `alice` and `bob`
+# NOTE: we need to switch to `master` account in order to provide
+# the initial funds to `alice` and `bob` accounts.
+
+account:create alice
+account:create bob
+
+# Supply the accounts `alice` and `bob` with funds
+# from the so called `master` account.
+
+account:use master
+pay --to alice --amount 0x1000
+pay --to bob --amount 0x500
+
+
+# Set `alice` as the active account:
+
+account:use alice
+
+# Check balances:
+
+account:balance
+account:use bob
+account:balance
+
+
+## 🪙 Step 3: Create and Transfer Assets
+
+# Switch back to `alice` and create a custom asset:
+account:use alice
+asset:create --symbol DEMO --supply 0x1000
+
+# Transfer 100 units of DEMO asset to `bob`:
+
+asset:transfer --asset DEMO --to bob --amount 0x64
+
+# Note: You can find Bob’s address with:
+
+account:get bob
+
+# Check asset balances:
+
+account:use bob
+asset:balances
+
+
+## 💸 Step 4: Transfer Native Tokens
+
+# Transfer 32 VSL from `alice` to `bob`:
+
+account:use alice
+pay --to bob --amount 0x20
+account:balance
+account:use bob
+account:balance
+
+
+## 🧶 Step 5: Submit and Settle a Claim
+
+# Submit a claim:
+
+account:use bob
+claim:submit '{"email":"bob@example.com"}' --type identity --proof 0xabc123
+
+# List submitted claims:
+
+claim:submitted
+
+# Settle a verified claim:
+
+claim:settle '{"email":"bob@example.com"}'
+
+
+## 🧠 Bonus: Some more commands
+
+account:current
+asset:balances
+
+
+## 🧹 Step 6: Clean Up
+
+# Stop the local server:
+
+
+server:stop
+
+
+# Remove accounts and networks:
+
+
+account:remove alice
+account:remove bob
+
+
+## ✅ You're Done!
+
+# You've successfully:
+
+# - Launched a local VSL server
+# - Managed accounts and balances
+# - Created and transferred assets
+# - Submitted and settled claims
+# - Explored the REPL
+# For more, run:
+# vsl-cli <command> --help
+
+
