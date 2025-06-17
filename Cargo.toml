@@ -1,7 +1,14 @@
 [package]
 name = "vsl-cli"
-version = "0.1.0"
 edition = "2024"
+description = "The CLI for managing wallets and interacting with the VSL node"
+version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository = "https://github.com/Pi-Squared-Inc/vsl"
+homepage = "https://pi2.network"
+documentation = "https://docs.pi2.network"
+publish = false
 
 [dependencies]
 vsl-sdk = {  git = "https://github.com/Pi-Squared-Inc/vsl-sdk", rev = "a1c2dd949f05716db4879381322422bea92a2cfa" }
