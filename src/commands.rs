@@ -247,7 +247,7 @@ pub enum Commands {
         #[arg(long)]
         symbol: String,
         /// Number of decimals used for this asset
-        #[arg(long)]
+        #[arg(long, default_value = "18")]
         decimals: String,
         /// Total number of tokens that exist
         #[arg(long)]
