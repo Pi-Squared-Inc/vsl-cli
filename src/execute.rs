@@ -15,7 +15,6 @@ use crate::rpc_server::start_server;
 use crate::rpc_server::stop_server;
 
 use jsonrpsee::core::params::ObjectParams;
-use linera_base::data_types::Amount;
 use log::info;
 use serde_json::Value;
 use serde_json::json;
