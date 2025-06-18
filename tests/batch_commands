@@ -4,6 +4,9 @@ network:current
 server:stop
 
 config:create local_test --overwrite
+config:use local_test
+network:list
+network:current
 
 # Start a fresh new one
 server:launch --db=tmp --master-balance=1000000

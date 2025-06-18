@@ -597,9 +597,10 @@ pub fn execute_command<T: RpcClientInterface>(
                     network.url, network.port, network.name
                 )))
             }
-            Err(err) => Err(RpcClientError::GeneralError(
-                "While adding a network".to_string(),
-            )),
+            Err(err) => Err(RpcClientError::GeneralError(format!(
+                "While adding a network: {}",
+                err
+            ))),
         },
         Commands::NetworkList { json, table } => {
             if *json && *table {
@@ -663,9 +664,9 @@ pub fn execute_command<T: RpcClientInterface>(
                         )))
                     }
                 }
-                Err(_) => Err(RpcClientError::GeneralError(format!(
-                    "Network {} is unknown",
-                    name
+                Err(err) => Err(RpcClientError::GeneralError(format!(
+                    "Network {} is unknown: {}",
+                    name, err
                 ))),
             }
         }
@@ -692,9 +693,10 @@ pub fn execute_command<T: RpcClientInterface>(
                             )))
                         }
                     }
-                    Err(_) => Ok(Value::String(
-                        "  no current network is set. Please add a known network with `network:add` command".to_string()
-                    )),
+                    Err(err) => Ok(Value::String(format!(
+                        "  no current network is set. Please add a known network with `network:add` command: {}",
+                        err
+                    ))),
                 }
             }
         }
@@ -810,9 +812,9 @@ pub fn execute_command<T: RpcClientInterface>(
             file,
             overwrite,
         } => {
-            let mut new_config = Configs::new(name.clone(), file.clone(), *overwrite)?;
+            let mut new_config = Configs::new(name.clone(), file.clone(), *overwrite, config.mode)?;
             if copy != "" {
-                let old_config = Configs::load(Some(copy.clone()))?;
+                let old_config = Configs::load(Some(copy.clone()), config.mode)?;
                 new_config = old_config;
             }
             Ok(Value::String(format!(
@@ -821,7 +823,7 @@ pub fn execute_command<T: RpcClientInterface>(
             )))
         }
         Commands::ConfigUse { name } => {
-            *config = Configs::load(Some(name.clone()))?;
+            *config = Configs::load(Some(name.clone()), config.mode)?;
             Configs::use_(name.clone());
             Ok(Value::String(format!("Using configuration {}", name)))
         }

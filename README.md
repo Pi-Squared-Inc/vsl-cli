@@ -469,7 +469,8 @@ cargo test
 cargo test
 
 # Integration tests
-cargo test --test end_to_end
+cargo test --test end_to_end_batch
+cargo test --test end_to_end_separate
 
 # Stress testing
 To run stress tests, do:

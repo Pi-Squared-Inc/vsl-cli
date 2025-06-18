@@ -14,6 +14,7 @@ use clap::CommandFactory;
 use clap::Parser;
 use commands::Cli;
 use commands::Commands;
+use configs::CliMode;
 use configs::Config;
 use configs::Configs;
 use configs::RpcServer;
@@ -270,8 +271,8 @@ fn output_result(result: &anyhow::Result<Value, RpcClientError>) {
     }
 }
 
-fn make_config() -> Result<Config> {
-    let mut config = Configs::load(None).context("Failed to load a current config")?;
+fn make_config(mode: CliMode) -> Result<Config> {
+    let mut config = Configs::load(None, mode).context("Failed to load a current config")?;
     match config.get_server() {
         Some(server) => {
             // In case server is not running - remove it
@@ -302,17 +303,18 @@ fn main() -> Result<()> {
     // Create the client connection
     let mut rpc_client = RpcClient::new();
 
-    // Load the existing config
-    let mut config = make_config()?;
-
     match cli.command {
         Commands::Repl {
             print_commands,
             tmp_config,
         } => {
+            // Load the existing config in REPL mode
+            let mut config = make_config(CliMode::MultiCommand)?;
             run_repl_loop(&mut config, &mut rpc_client, print_commands);
         }
         _ => {
+            // Load the existing config in a single command mode
+            let mut config = make_config(CliMode::SingleCommand)?;
             if std::env::var("VSL_CLI_PRINT_COMMANDS").unwrap_or(String::new()) == "1" {
                 println!("{}", std::env::args().collect::<Vec<String>>().join(" "));
             }

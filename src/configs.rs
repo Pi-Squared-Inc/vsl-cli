@@ -6,6 +6,7 @@ use crate::networks::Networks;
 
 use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
 use dirs::config_dir;
 use regex::Regex;
 use serde::Deserialize;
@@ -47,6 +48,15 @@ pub struct RpcServer {
     pub local: Option<RpcServerLocal>,
 }
 
+/// The mode of `vsl-cli` running.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub enum CliMode {
+    /// After executing a single command the `vsl-cli` application exits
+    SingleCommand = 0,
+    /// Multy commands may be executed during the `vsl-cli` run. Typically this means REPL mode.
+    MultiCommand = 1,
+}
+
 /// The database of `vsl-cli` application. Stored persistently.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -66,6 +76,13 @@ pub struct Config {
     pub submitted: HashMap<String, SubmittedClaim>,
     /// If a local server was started via `vsl-cli`, the info about it is stored here.
     pub server: Option<RpcServer>,
+    /// The flag of being in REPL mode
+    #[serde(skip, default = "default_mode")]
+    pub mode: CliMode,
+}
+
+fn default_mode() -> CliMode {
+    CliMode::SingleCommand
 }
 
 /// The mapping of config names to their locations. Stored persistently.
@@ -116,14 +133,14 @@ impl Configs {
             .context("Failed to write configs file")
     }
     /// Create a new configuration with a user provided name and optional path.
-    pub fn new(name: String, file: String, overwrite: bool) -> Result<Config> {
+    pub fn new(name: String, file: String, overwrite: bool, mode: CliMode) -> Result<Config> {
         if name == VSL_TMP_CONFIG {
             if file != "" {
                 return Err(anyhow::anyhow!(
                     "The path to the temporary config makes no sense"
                 ));
             }
-            Ok(Config::new(name, None))
+            Ok(Config::new(name, None, mode))
         } else {
             let mut configs: Configs = Configs::read()?;
             if !overwrite && configs.configs.contains_key(&name) {
@@ -144,7 +161,7 @@ impl Configs {
                 }
                 file
             };
-            let new_config = Config::new(name.clone(), Some(file.clone()));
+            let new_config = Config::new(name.clone(), Some(file.clone()), mode);
             configs.configs.insert(name.clone(), file);
             configs.current = Some(name);
             Configs::save(&configs)?;
@@ -153,22 +170,27 @@ impl Configs {
         }
     }
     /// Load a previously used configuration by name. If name is omitted, the current is used.
-    pub fn load(name: Option<String>) -> Result<Config> {
+    pub fn load(name: Option<String>, mode: CliMode) -> Result<Config> {
         let configs = Configs::read()?;
         let name = match name {
             Some(name) => Some(name),
             None => configs.current,
         };
         match name {
-            None => Ok(Config::new(VSL_TMP_CONFIG.to_string(), None)),
+            None => Ok(Config::new(VSL_TMP_CONFIG.to_string(), None, mode)),
             Some(name) => {
                 if name == VSL_TMP_CONFIG {
-                    Ok(Config::new(VSL_TMP_CONFIG.to_string(), None))
+                    Ok(Config::new(VSL_TMP_CONFIG.to_string(), None, mode))
                 } else {
                     match configs.configs.get(&name) {
                         None => Err(anyhow::anyhow!("Configuration {} is not found", name)),
-                        Some(path) => serde_json::from_str(&std::fs::read_to_string(path)?)
-                            .or(Err(anyhow::anyhow!("Configs are corrupted"))),
+                        Some(path) => {
+                            let mut config: Config =
+                                serde_json::from_str(&std::fs::read_to_string(path)?)
+                                    .or(Err(anyhow::anyhow!("Configs are corrupted")))?;
+                            config.mode = mode;
+                            Ok(config)
+                        }
                     }
                 }
             }
@@ -218,7 +240,7 @@ impl Configs {
 
 impl Config {
     /// Create a new clear configuration
-    pub fn new(name: String, file: Option<PathBuf>) -> Self {
+    pub fn new(name: String, file: Option<PathBuf>, mode: CliMode) -> Self {
         Config {
             name: name.clone(),
             file: file,
@@ -228,6 +250,7 @@ impl Config {
             identifiers: HexMap::new("(0x)?", 64),
             submitted: HashMap::default(),
             server: None,
+            mode: mode,
         }
     }
 
@@ -255,7 +278,12 @@ impl Config {
                 file.write_all(json.as_bytes())
                     .context("Failed to write config file")
             }
-            None => Ok(()),
+            None => match self.mode {
+                CliMode::SingleCommand => Err(anyhow!(
+                    "The changed config state cannot be saved: no path is provided.\nPlease make use of some config, `vsl-cli config:create --help`"
+                )),
+                CliMode::MultiCommand => Ok(()),
+            },
         }
     }
 
