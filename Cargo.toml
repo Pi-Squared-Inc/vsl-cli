@@ -2,9 +2,9 @@
 name = "vsl-cli"
 edition = "2024"
 description = "The CLI for managing wallets and interacting with the VSL node"
-version.workspace = true
-authors.workspace = true
-license-file.workspace = true
+version = "0.1.0"
+authors = ["Pi Squared Inc."]
+license-file = "LICENSE"
 repository = "https://github.com/Pi-Squared-Inc/vsl"
 homepage = "https://pi2.network"
 documentation = "https://docs.pi2.network"
