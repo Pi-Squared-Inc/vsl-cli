@@ -378,6 +378,7 @@ vsl asset:create [OPTIONS]
 
 **Options:**
 - `--symbol <SYMBOL>` - Name of the asset (required)
+- `--decimals <NUM>` - Number of decimals used for this asset (default: 18)
 - `--supply <SUPPLY>` - Total number of tokens that exist (required)
 - `-n, --network <NETWORK>` - URL to connect to, or name of a known network
 
