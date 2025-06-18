@@ -47,15 +47,15 @@ account:state-get
 #account:state-set invalid_state
 
 account:use acc1
-asset:create --symbol x_as1 --supply 0x100
+asset:create --symbol x_as1 --supply 0x100 --decimals 8
 account:balance
-asset:create --symbol x_as2 --supply 300
+asset:create --symbol x_as2 --supply 300 --decimals 8
 account:balance
 
 account:use acc2
-asset:create --symbol y_as1 --supply 0x200
+asset:create --symbol y_as1 --supply 0x200 --decimals 8
 account:balance
-asset:create --symbol y_as2 --supply 400
+asset:create --symbol y_as2 --supply 400 --decimals 8
 account:balance
 
 account:use acc1

@@ -246,6 +246,9 @@ pub enum Commands {
         /// Name of the asset
         #[arg(long)]
         symbol: String,
+        /// Number of decimals used for this asset
+        #[arg(long)]
+        decimals: String,
         /// Total number of tokens that exist
         #[arg(long)]
         supply: String,

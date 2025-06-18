@@ -11,7 +11,7 @@ documentation = "https://docs.pi2.network"
 publish = false
 
 [dependencies]
-vsl-sdk = {  git = "https://github.com/Pi-Squared-Inc/vsl-sdk", rev = "a1c2dd949f05716db4879381322422bea92a2cfa" }
+vsl-sdk = {  git = "https://github.com/Pi-Squared-Inc/vsl-sdk", rev = "e1307abcb2cecddb8d42c8aa2c3af200d5e6f27d" }
 
 alloy = "0.15.10"
 anyhow = "1.0.98"

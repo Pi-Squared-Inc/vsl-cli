@@ -515,6 +515,7 @@ pub fn execute_command<T: RpcClientInterface>(
         Commands::AssetCreate {
             network,
             symbol,
+            decimals,
             supply,
         } => {
             let account = config.get_account(None)?;
@@ -524,6 +525,7 @@ pub fn execute_command<T: RpcClientInterface>(
                 account_id: account.credentials.address,
                 nonce: nonce.to_string(),
                 ticker_symbol: symbol.clone(),
+                decimals: u8::from_str_radix(&decimals, 10).unwrap(),
                 total_supply: to_hex(supply)?,
             };
             let message_signed =
