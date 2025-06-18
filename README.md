@@ -61,17 +61,17 @@ Claims can be verified using various methods: digital signatures, re-execution, 
 
 ### 🔐 Account Management
 ```bash
-vsl-cli account:create <name>          # Create new account
-vsl-cli account:load <name> <key>      # Load an existing account with particular private key
-vsl-cli account:export <file>          # Export the accounts private key to a file
-vsl-cli account:list                   # List all accounts
-vsl-cli account:balance [address]      # Check account balance
-vsl-cli account:use <name>             # Switch active account
-vsl-cli account:current                # Show current account
-vsl-cli account:get [address]          # Get account information
-vsl-cli account:state-get [address]    # Get account state
-vsl-cli account:state-set <state>      # Set account state
-vsl-cli account:remove <name>          # Delete account
+vsl-cli account:create <name>           # Create new account
+vsl-cli account:load <name> -p <key>    # Load an existing account with particular private key
+vsl-cli account:export <name> -f <file> # Export the accounts private key to a file
+vsl-cli account:list                    # List all accounts
+vsl-cli account:balance [address]       # Check account balance
+vsl-cli account:use <name>              # Switch active account
+vsl-cli account:current                 # Show current account
+vsl-cli account:get [address]           # Get account information
+vsl-cli account:state-get [address]     # Get account state
+vsl-cli account:state-set <state>       # Set account state
+vsl-cli account:remove <name>           # Delete account
 ```
 
 ### 📝 Claim Operations
@@ -85,11 +85,11 @@ vsl-cli claim:get <id>                 # Get claim by ID
 
 ### 🪙 Asset Management
 ```bash
-vsl-cli asset:create --symbol <SYM>    # Create new asset
-vsl-cli asset:balance <asset>          # Check asset balance
-vsl-cli asset:balances                 # Check all asset balances
-vsl-cli asset:transfer --asset <ASSET> # Transfer assets
-vsl-cli asset:get <asset>              # Get asset information
+vsl-cli asset:create --symbol <SYM> --supply <amount>                # Create new asset
+vsl-cli asset:balance <asset>                                        # Check asset balance
+vsl-cli asset:balances                                               # Check all asset balances
+vsl-cli asset:transfer --asset <ASSET> --to <name> --amount <amount> # Transfer assets
+vsl-cli asset:get <asset>                                            # Get asset information
 ```
 
 ### 🌐 Network Management
