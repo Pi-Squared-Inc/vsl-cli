@@ -273,25 +273,30 @@ fn output_result(result: &anyhow::Result<Value, RpcClientError>) {
 
 fn make_config(mode: CliMode) -> Result<Config> {
     let mut config = Configs::load(None, mode).context("Failed to load a current config")?;
-    match config.get_server() {
-        Some(server) => {
-            // In case server is not running - remove it
-            if !check_server_is_alive(&server) {
-                config.set_server(None);
-                match try_to_find_server() {
+    match mode {
+        CliMode::MultiCommand => {
+            match config.get_server() {
+                Some(server) => {
+                    // In case server is not running - remove it
+                    if !check_server_is_alive(&server) {
+                        config.set_server(None);
+                        match try_to_find_server() {
+                            Some(pid) => config
+                                .set_server(Some(RpcServer { pid, local: None }))
+                                .context("Failed to set server A")?,
+                            None => {}
+                        }
+                    }
+                }
+                None => match try_to_find_server() {
                     Some(pid) => config
                         .set_server(Some(RpcServer { pid, local: None }))
-                        .context("Failed to set server")?,
+                        .context("Failed to set server B")?,
                     None => {}
-                }
+                },
             }
         }
-        None => match try_to_find_server() {
-            Some(pid) => config
-                .set_server(Some(RpcServer { pid, local: None }))
-                .context("Failed to set server")?,
-            None => {}
-        },
+        CliMode::SingleCommand => {}
     }
     Ok(config)
 }

@@ -6,10 +6,6 @@
 
 A powerful command-line interface for interacting with the Verifiable Settlement Layer (VSL) network - Pi Squared's infrastructure for scalable, affordable, and customizable verifiability across Web3 protocols.
 
-## VSL deployment
-
-Please refer to [quick_start.md](./quick_start.md) file to learn how to run VSL locally or use public devnet RPC endpoint.
-
 ## Overview
 
 VSL CLI enables developers and users to interact with the VSL network through a comprehensive set of commands for:
