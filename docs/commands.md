@@ -564,12 +564,10 @@ vsl server:launch [OPTIONS]
 **Options:**
 - `--db <DB>` - Path to the VSL DB directory. If omitted, use the default. If the value is `tmp` - create a temporary directory (default: empty string)
 - `--log-level <LOG_LEVEL>` - The logging level of an RPC server. One of: info, warn, error, ... (default: "info")
-- `--master-account <MASTER_ACCOUNT>` - Master account name (default: "master")
-- `--master-balance <MASTER_BALANCE>` - Master account balance (default: "1000000")
 
 **Example:**
 ```bash
-vsl server:launch --db "./my_db" --log-level "debug" --master-balance "5000000"
+vsl server:launch --db "./my_db" --log-level "debug" --genesis-file "genesis.json"
 ```
 
 #### `server:dump`

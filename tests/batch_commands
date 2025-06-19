@@ -9,7 +9,8 @@ network:list
 network:current
 
 # Start a fresh new one
-server:launch --db=tmp --master-balance=1000000
+server:launch --db=tmp --genesis-file=vsl-cli/tests/genesis.json --force
+account:load master -p 0xb6dd863bea551b5bb27ce9917316a01ea4c331f24e0e4fe56e28eb430f175ed7
 account:current
 account:balance
 account:export

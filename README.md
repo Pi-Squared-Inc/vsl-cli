@@ -204,7 +204,7 @@ vsl-cli config:create production
 vsl-cli config:use development
 
 # Start local VSL server with temporary database
-vsl-cli server:launch --db tmp --log-level debug --master-balance 1000000000
+vsl-cli server:launch --db tmp --log-level debug --genesis-file genesis.json
 
 # Create development account with initial balance
 vsl-cli account:create dev --balance 0x989680

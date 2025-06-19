@@ -33,12 +33,6 @@ pub struct Account {
     pub credentials: Credentials,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitAccount {
-    pub account: String,
-    pub initial_balance: String,
-}
-
 fn generate_private_key() -> String {
     let mut rng = thread_rng();
     // Generate a random secret key

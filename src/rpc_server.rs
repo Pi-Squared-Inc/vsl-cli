@@ -1,7 +1,6 @@
 use crate::configs::RpcServer;
 use crate::configs::RpcServerLocal;
 
-use crate::accounts::InitAccount;
 use crate::networks::VSL_CLI_DEFAULT_NETWORK_PORT;
 use anyhow::Context;
 use anyhow::Result;
@@ -21,11 +20,12 @@ pub fn start_server(
     vsl_dir: PathBuf,
     db: &String,
     log_level: String,
-    maybe_master_account: Option<InitAccount>,
+    genesis_file: Option<String>,
+    genesis_json: Option<String>,
+    force: bool,
 ) -> Result<(RpcServer, Option<TempDir>)> {
     let mut claim_db_path = String::new();
     let mut tokens_db_path = String::new();
-    let mut use_genesis = false;
     let mut tempdir: Option<tempfile::TempDir> = None;
     if db == "tmp" {
         if claim_db_path != "" || tokens_db_path != "" {
@@ -62,7 +62,6 @@ pub fn start_server(
                     "Failed to create temporary directory".to_string(),
                 ))?,
         );
-        use_genesis = true;
         tempdir = Some(temp_dir);
     } else {
         let claim_db_dir = PathBuf::from(db).join("vsl-db");
@@ -73,7 +72,6 @@ pub fn start_server(
         tokens_db_path = String::from(token_db_dir.to_str().ok_or(anyhow::anyhow!(
             "Failed to get the tokens.db directory".to_string(),
         ))?);
-        use_genesis = !token_db_dir.exists() && !claim_db_dir.exists();
     }
     std::fs::create_dir_all(&claim_db_path).context("Failed to create claim DB directory")?;
     std::fs::create_dir_all(&tokens_db_path).context("Failed to create tokens DB directory")?;
@@ -89,14 +87,16 @@ pub fn start_server(
         args.push("--tokens-db-path".to_string());
         args.push(tokens_db_path)
     }
-    if use_genesis {
-        args.push("--use-genesis".to_string());
+    if let Some(genesis_file) = genesis_file {
+        args.push("--genesis-file".to_string());
+        args.push(genesis_file);
     }
-    if let Some(master_account) = maybe_master_account {
-        args.push("--master-account".to_string());
-        args.push(
-            serde_json::to_string(&master_account).context("Failed to serialize master account")?,
-        );
+    if let Some(genesis_json) = genesis_json {
+        args.push("--genesis-json".to_string());
+        args.push(genesis_json);
+    }
+    if force {
+        args.push("--force".to_string());
     }
     // Create timestamped log files
     let timestamp = SystemTime::now()

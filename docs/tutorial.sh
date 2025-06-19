@@ -13,7 +13,7 @@ vsl-cli config:create local_test --overwrite
 ## 🔌 Step 1: Connect to a Network
 # In case the VSL node is installed locally, start a local VSL node:
 
-vsl-cli server:launch --db tmp --master-balance 1000000000
+vsl-cli server:launch --db tmp --genesis-file "genesis.json"
 
 # Or use some external node, in case there's no local VSL node:
 # Uncomment these lines in case of remote network
@@ -25,6 +25,8 @@ vsl-cli server:launch --db tmp --master-balance 1000000000
 
 vsl-cli health:check
 
+# initialize the master account (it should be one of the genesis accounts):
+vsl-cli account:load master -p 0xhex-private-key-of-master-account
 
 ## 👤 Step 2: Create and Use an Account
 
@@ -113,7 +115,6 @@ vsl-cli server:stop
 vsl-cli account:remove alice
 vsl-cli account:remove bob
 
-# This account is created implicity when the server with `--master-balance` is started
 vsl-cli account:remove master
 
 # Finally, remove the test configuration

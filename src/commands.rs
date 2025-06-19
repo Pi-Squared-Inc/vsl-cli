@@ -353,12 +353,24 @@ pub enum Commands {
             help = "the log value for: RUST_LOG=<value>. One of: info, warn, error, ..."
         )]
         log_level: String,
-        /// Master account name.
-        #[arg(long, default_value = "master")]
-        master_account: String,
-        /// Master account balance.
-        #[arg(long, default_value = "1000000")]
-        master_balance: String,
+        #[arg(
+            long,
+            default_value = None,
+            help = "Optional path to a genesis json file. By default, this is used only if the DB is empty.",
+        )]
+        genesis_file: Option<String>,
+        #[arg(
+            long,
+            default_value = None,
+            help = "Optional genesis json string. By default, this is used only if the DB is empty. Exactly one of genesis-json and genesis-file must be provided.",
+        )]
+        genesis_json: Option<String>,
+        #[arg(
+            long,
+            default_value = None,
+            help = "Whether to overwrite the DB with the genesis file data.",
+        )]
+        force: bool,
     },
     /// Dump a local RPC server std output.
     #[command(name = "server:dump")]

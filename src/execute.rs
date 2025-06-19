@@ -14,6 +14,7 @@ use crate::rpc_server::dump_server;
 use crate::rpc_server::start_server;
 use crate::rpc_server::stop_server;
 
+use alloy::signers::k256::elliptic_curve::generic_array;
 use jsonrpsee::core::params::ObjectParams;
 use log::info;
 use serde_json::Value;
@@ -734,9 +735,20 @@ pub fn execute_command<T: RpcClientInterface>(
         Commands::ServerLaunch {
             db,
             log_level,
-            master_account,
-            master_balance,
+            genesis_file,
+            genesis_json,
+            force,
         } => {
+            if genesis_file.is_some() && genesis_json.is_some() {
+                return Err(RpcClientError::GeneralError(
+                    "You cannot use both `--genesis-file` and `--genesis-json` at the same time for server:launch.".to_string()
+                ));
+            } else if genesis_file.is_none() && genesis_json.is_none() {
+                return Err(RpcClientError::GeneralError(
+                    "You must use one of `--genesis-file` and `--genesis-json` for server:launch."
+                        .to_string(),
+                ));
+            }
             let local_network = Network::default();
             if config.get_server().is_some() {
                 Ok(Value::String("Local RPC server is already up".to_string()))
@@ -748,8 +760,9 @@ pub fn execute_command<T: RpcClientInterface>(
                     config,
                     db.clone(),
                     log_level.clone(),
-                    master_account.clone(),
-                    master_balance.clone(),
+                    genesis_file.clone(),
+                    genesis_json.clone(),
+                    *force,
                 )?;
                 // Check if it's up
                 if check_network_is_up(rpc_client, local_network) {
@@ -769,7 +782,7 @@ pub fn execute_command<T: RpcClientInterface>(
                     }
                 } else {
                     Err(RpcClientError::GeneralError(format!(
-                        "Failed to start PRC local server, proc id: {:?}",
+                        "Failed to start RPC local server, proc id: {:?}",
                         new_server.pid
                     )))
                 }
@@ -893,30 +906,18 @@ pub fn launch_server(
     config: &mut Config,
     db: String,
     log_level: String,
-    master_account: String,
-    master_balance: String,
+    genesis_file: Option<String>,
+    genesis_json: Option<String>,
+    force: bool,
 ) -> Result<(RpcServer, Option<TempDir>), RpcClientError> {
-    let init_account = if master_balance != "" {
-        match config.get_account(Some(&master_account)) {
-            Ok(account) => {
-                return Err(RpcClientError::GeneralError(
-                    "Master account is already present".to_string(),
-                ));
-            }
-            Err(_) => {
-                let credentials = config.generate_credentials(None)?;
-                let account = config.create_account(master_account, credentials, false)?;
-                Some(crate::accounts::InitAccount {
-                    account: account.credentials.address,
-                    initial_balance: master_balance.clone(),
-                })
-            }
-        }
-    } else {
-        None
-    };
-    let new_server: (RpcServer, Option<TempDir>) =
-        start_server(vsl_directory()?, &db, log_level.clone(), init_account)?;
+    let new_server: (RpcServer, Option<TempDir>) = start_server(
+        vsl_directory()?,
+        &db,
+        log_level.clone(),
+        genesis_file,
+        genesis_json,
+        force,
+    )?;
     Ok(new_server)
 }
 

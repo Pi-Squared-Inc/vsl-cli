@@ -8,7 +8,7 @@
 ## 🔌 Step 1: Connect to a Network
 # In case the VSL node is installed locally, start a local VSL node:
 
-server:launch --db tmp --master-balance 1000000000
+server:launch --db tmp --genesis-file "genesis.json"
 
 # Or use some external node, in case there's no local VSL node:
 # Uncomment these lines in case of remote network
@@ -19,6 +19,10 @@ server:launch --db tmp --master-balance 1000000000
 # Verify connection:
 
 health:check
+
+# initialize the master account (it should be one of the genesis accounts):
+
+account:load master -p 0xhex-private-key-of-master-account
 
 
 ## 👤 Step 2: Create and Use an Account

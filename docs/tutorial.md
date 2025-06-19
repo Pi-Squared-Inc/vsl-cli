@@ -15,7 +15,7 @@ vsl-cli repl --tmp-config
 In case the VSL node is installed locally, start a local VSL node:
 
 ```bash
-vsl> server:launch --db tmp --master-balance 1000000000
+vsl> server:launch --db tmp --genesis-file "genesis.json"
 ```
 
 Or use some external node, in case there's no local VSL node:

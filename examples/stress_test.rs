@@ -70,6 +70,25 @@ fn create_accounts(
     let mut client = RpcClient::new();
     let mut success = true;
     let mut configs = Vec::new();
+
+    let load_master_account = Commands::AccountLoad {
+        name: "master".to_string(),
+        private_key: Some(
+            "0xb6dd863bea551b5bb27ce9917316a01ea4c331f24e0e4fe56e28eb430f175ed7".to_string(),
+        ),
+        overwrite: false,
+    };
+    let load_master_response = execute_single_request(config, &load_master_account, &mut client);
+    if !load_master_response.success {
+        return Err(anyhow::anyhow!(
+            "{}Failed to load master account: {}",
+            indent.clone(),
+            load_master_response
+                .error
+                .unwrap_or("Unknown error".to_string())
+        ));
+    }
+
     for n in 0..stress_config.max_concurrent {
         let acc_name = format!("acc_{}", n);
         let create_account_comm = Commands::AccountCreate {
@@ -602,8 +621,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut config,
             "tmp".to_string(),
             "info".to_string(),
-            "master".to_string(),
-            "100000000".to_string(),
+            None,
+            Some(
+                "{
+                  \"accounts\": [
+                    {
+                      \"id\": \"0x749ab3318b74907f6e5856ce9ce1f3b55e3bb38a\",
+                      \"balance\": \"1000000000000000000000000\"
+                    }
+                  ],
+                  \"tokens\": []
+                }
+                "
+                .to_string(),
+            ),
+            true,
         )?;
         std::thread::sleep(std::time::Duration::from_millis(50));
         check_server(stress_config.verbosity)?;
