@@ -534,12 +534,24 @@ pub fn execute_command<T: RpcClientInterface>(
             params.insert("asset_data", message_signed);
             let response = rpc_client.make_request(network, "vsl_createAsset", params)?;
             match response {
-                Value::String(ref asset_id) => {
-                    config.add_identifier(symbol, asset_id.clone())?;
-                    Ok(response)
-                }
+                Value::Object(ref map) => match map.get("asset_id") {
+                    Some(value) => match value {
+                        Value::String(asset_id) => {
+                            config.add_identifier(symbol, asset_id.clone())?;
+                            Ok(response)
+                        }
+                        _ => Err(RpcClientError::GeneralError(format!(
+                            "Field `asset_id` in response to `asset:create` must be a string, got: '{}'",
+                            response
+                        ))),
+                    },
+                    None => Err(RpcClientError::GeneralError(format!(
+                        "Response to `asset:create` must contain field asset_id, got: '{}'",
+                        response
+                    ))),
+                },
                 _ => Err(RpcClientError::GeneralError(format!(
-                    "Response to `asset:create` must be a asset_id (string), got: '{}'",
+                    "Response to `asset:create` must be an object, got: '{}'",
                     response
                 ))),
             }
