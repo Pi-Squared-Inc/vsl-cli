@@ -343,16 +343,9 @@ pub enum Commands {
     /// Start a local RPC server in background.
     #[command(name = "server:launch")]
     ServerLaunch {
-        /// Path to the VSL DB directory. If ommited, use the default. If the value is `tmp` - create a temporary directory.
-        #[arg(long, default_value = "")]
+        /// Path to the VSL DB directory. If the value is `tmp` - create a temporary directory.
+        #[arg(long, default_value = "db-data")]
         db: String,
-        /// The logging level of an RPC server
-        #[arg(
-            long,
-            default_value = "info",
-            help = "the log value for: RUST_LOG=<value>. One of: info, warn, error, ..."
-        )]
-        log_level: String,
         #[arg(
             long,
             default_value = None,
@@ -374,7 +367,14 @@ pub enum Commands {
     },
     /// Dump a local RPC server std output.
     #[command(name = "server:dump")]
-    ServerDump {},
+    ServerDump {
+        /// Number of lines of the dump, which are shown.
+        #[arg(short, long, default_value_t = 128)]
+        lines: u32,
+        /// Show the whole dump.
+        #[arg(short, long, default_value_t = false)]
+        all: bool,
+    },
     /// Stop a local RPC server.
     #[command(name = "server:stop")]
     ServerStop {},

@@ -7,13 +7,6 @@ use std::time;
 
 #[test]
 fn test_cli_end_to_end_batch() {
-    // Make sure that `vsl-core` - the server - is built.
-    Command::new("cargo")
-        .current_dir("../vsl-core")
-        .args(["build", "--release"])
-        .output()
-        .expect("failed to build vsl-core (RPC server)");
-
     // VSL_CLI_PRINT_COMMANDS=1 VSL_CLI_PERSISTENT_CONFIG=0 ./cli.sh repl < ../vsl-cli/tests/batch_commands
     let batch_file = File::open("../vsl-cli/tests/batch_commands")
         .expect("Failed to open the batch command file");
@@ -45,7 +38,7 @@ fn test_cli_end_to_end_batch() {
     for must_have in vec![
         "Welcome to vsl-cli REPL.",
         "The configuration local_test is created",
-        "Local RPC server is spawned, process id:",
+        "Local RPC server is spawned",
         "vsl> health:check\nok",
         "Available networks:\n  default - http://localhost:44444 -- up",
         "Account acc1 is created, address:",
