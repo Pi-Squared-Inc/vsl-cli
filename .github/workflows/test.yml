@@ -41,17 +41,8 @@ jobs:
           sudo rm -rf /opt/ghc
           df -h
 
-      - name: Checkout main VSL repository
-        uses: actions/checkout@v4
-        with:
-          repository: Pi-Squared-Inc/vsl
-          token: ${{ steps.temp-token.outputs.token }}
-          path: ./vsl
-
       - name: Checkout CLI repository
         uses: actions/checkout@v4
-        with:
-          path: ./vsl/vsl-cli
 
       - name: Install system dependencies
         run: |
@@ -97,16 +88,13 @@ jobs:
 
       - name: Check format
         run: cargo +nightly fmt --all -- --check
-        working-directory: ./vsl/vsl-cli 
 
       - name: Build
         run: cargo build
-        working-directory: ./vsl/vsl-cli 
         env:
           CARGO_INCREMENTAL: 1
 
       - name: Test
         run: cargo test
-        working-directory: ./vsl/vsl-cli 
         env:
           CARGO_INCREMENTAL: 1
