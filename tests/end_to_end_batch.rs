@@ -1,20 +1,30 @@
 #![allow(unused)]
 
 use std::fs::File;
+use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time;
 
 #[test]
 fn test_cli_end_to_end_batch() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     // VSL_CLI_PRINT_COMMANDS=1 VSL_CLI_PERSISTENT_CONFIG=0 ./cli.sh repl < ../vsl-cli/tests/batch_commands
-    let batch_file = File::open("../vsl-cli/tests/batch_commands")
+    let batch_file = File::open(dir.join("tests").join("batch_commands"))
         .expect("Failed to open the batch command file");
     let error_prefix = "CLI Error";
-    let output = Command::new("../target/debug/vsl-cli")
+    //let output = Command::new(dir.join("target").join("debug").join("vsl-cli"))
+    let output = Command::new("cargo")
         .env("RUST_LOG", "info")
         .env("VSL_CLI_ERROR_PREFIX", error_prefix)
-        .args(["repl", "--print-commands", "--tmp-config"])
+        .args([
+            "run",
+            "-p",
+            "vsl-cli",
+            "repl",
+            "--print-commands",
+            "--tmp-config",
+        ])
         .stdin(batch_file)
         .output()
         .expect("failed to execute CLI batch file");

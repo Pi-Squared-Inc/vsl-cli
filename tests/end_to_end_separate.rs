@@ -1,13 +1,14 @@
 #![allow(unused)]
 
-use std::fs::File;
+use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time;
 
 #[test]
 fn test_cli_end_to_end_separate() {
-    let batch_file = std::fs::read_to_string("../vsl-cli/tests/batch_commands")
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let batch_file = std::fs::read_to_string(dir.join("tests").join("batch_commands"))
         .expect("Failed to read the batch command file");
     let error_prefix = "CLI Error";
     let mut errors = Vec::new();
@@ -17,10 +18,12 @@ fn test_cli_end_to_end_separate() {
             continue;
         }
         println!("vsl-cli {}", line);
-        let output = Command::new("../target/debug/vsl-cli")
+        let mut args = vec!["run".to_string(), "-p".to_string(), "vsl-cli".to_string()];
+        args.extend(split_with_quotes(&line));
+        let output = Command::new("cargo")
             .env("RUST_LOG", "info")
             .env("VSL_CLI_ERROR_PREFIX", error_prefix)
-            .args(split_with_quotes(&line))
+            .args(args)
             .output()
             .expect("failed to execute CLI batch file");
         let stdout = String::from_utf8(output.stdout).unwrap();
