@@ -2,7 +2,7 @@ name: VSL CLI CI
 
 defaults:
   run:
-    working-directory: .
+    working-directory: ./vsl/vsl-cli
 
 on:
   pull_request:
@@ -41,8 +41,17 @@ jobs:
           sudo rm -rf /opt/ghc
           df -h
 
-      - name: Checkout repository
+      - name: Checkout main VSL repository
         uses: actions/checkout@v4
+        with:
+          repository: Pi-Squared-Inc/vsl
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./vsl
+
+      - name: Checkout CLI repository
+        uses: actions/checkout@v4
+        with:
+          path: ./vsl/vsl-cli
 
       - name: Install system dependencies
         run: |
