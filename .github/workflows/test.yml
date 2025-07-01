@@ -1,0 +1,100 @@
+name: VSL CLI CI
+
+defaults:
+  run:
+    working-directory: .
+
+on:
+  pull_request:
+    branches: [ main ]
+
+
+jobs:
+  vsl-ci:
+    name: Build, Test & Deploy VSL CLI
+    runs-on: [self-hosted, aws, us-east-2, m6a.4xlarge]
+
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: temp-token
+        name: Generate temporary GitHub Token
+        with:
+          app-id: ${{ vars.CICD_GITHUB_WEBAPP_ID }}
+          private-key: ${{ secrets.CICD_GITHUB_WEBAPP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - uses: docker/login-action@v3
+        name: Login to GitHub Container Registry
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Git credentials for private dependencies
+        run: |
+          git config --global url."https://${{ github.repository_owner }}:${{ steps.temp-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          df -h
+
+      - name: Checkout CLI repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make \
+            netcat-openbsd \
+            build-essential \
+            clang \
+            curl \
+            git \
+            libssl-dev \
+            pkg-config \
+            protobuf-compiler \
+            libprotobuf-dev \
+            docker-compose
+
+      - name: Set up Rust
+        run: |
+          if ! command -v rustup &>/dev/null; then
+            curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          source "$HOME/.cargo/env"
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - name: Set incremental builds
+        run: echo "CARGO_INCREMENTAL=1" >> $GITHUB_ENV
+      - name: Install rustfmt for nightly
+        run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+
+      - name: Cache Cargo registry and Git index
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check format
+        run: cargo +nightly fmt --all -- --check
+
+      - name: Build
+        run: cargo build
+        env:
+          CARGO_INCREMENTAL: 1
+
+      - name: Test
+        run: cargo test
+        env:
+          CARGO_INCREMENTAL: 1
