@@ -11,16 +11,16 @@ use vsl_cli::commands::Commands;
 use vsl_cli::configs::CliMode;
 use vsl_cli::configs::Config;
 use vsl_cli::configs::Configs;
-use vsl_cli::configs::RpcServer;
+use vsl_cli::configs::RpcServerInit;
+use vsl_cli::configs::RpcServerLocal;
 use vsl_cli::configs::VSL_TMP_CONFIG;
-use vsl_cli::configs::vsl_directory;
 use vsl_cli::execute::execute_command;
-use vsl_cli::execute::launch_server;
 use vsl_cli::networks::Network;
 use vsl_cli::rpc_client::RpcClient;
 use vsl_cli::rpc_client::check_network_is_up;
-use vsl_cli::rpc_server::dump_server;
-use vsl_cli::rpc_server::stop_server;
+use vsl_cli::rpc_server::dump_local_server;
+use vsl_cli::rpc_server::init_local_server;
+use vsl_cli::rpc_server::stop_local_server;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StressTestConfig {
@@ -617,12 +617,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             false,
             CliMode::MultiCommand,
         )?;
-        let (mut server, _tempdir) = launch_server(
-            &mut config,
-            "tmp".to_string(),
-            "info".to_string(),
-            None,
-            Some(
+        let (mut server, _tempdir) = init_local_server(
+            &"tmp".to_string(),
+            RpcServerInit::GenesisJson(
                 "{
                   \"accounts\": [
                     {
@@ -649,10 +646,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!(
                         "{}Server stdout:\n{}",
                         indent_0,
-                        dump_server(&server.local.clone().unwrap())?
+                        dump_local_server(128, false)?
                     )
                 }
-                stop_server(&server)?;
+                stop_local_server()?;
                 std::thread::sleep(std::time::Duration::from_millis(50));
                 if stress_config.verbosity > 1 {
                     println!("{}Server successfully stopped", indent_0)
@@ -672,10 +669,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!(
                         "{}Server stdout:\n{}",
                         indent_0,
-                        dump_server(&server.local.clone().unwrap())?
+                        dump_local_server(128, false)?
                     )
                 }
-                stop_server(&server)?;
+                stop_local_server()?;
                 std::thread::sleep(std::time::Duration::from_millis(50));
                 break;
             }

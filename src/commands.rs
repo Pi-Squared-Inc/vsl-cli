@@ -340,41 +340,38 @@ pub enum Commands {
         name: String,
     },
     #[command(subcommand_help_heading = "Auxiliary commands")]
-    /// Start a local RPC server in background.
-    #[command(name = "server:launch")]
-    ServerLaunch {
-        /// Path to the VSL DB directory. If ommited, use the default. If the value is `tmp` - create a temporary directory.
-        #[arg(long, default_value = "")]
+    /// Initialize and start a local RPC server in background.
+    #[command(name = "server:init")]
+    ServerInit {
+        /// Path to the VSL DB directory. If the value is `tmp` - create a temporary directory.
+        #[arg(long, default_value = "db-data")]
         db: String,
-        /// The logging level of an RPC server
-        #[arg(
-            long,
-            default_value = "info",
-            help = "the log value for: RUST_LOG=<value>. One of: info, warn, error, ..."
-        )]
-        log_level: String,
         #[arg(
             long,
             default_value = None,
-            help = "Optional path to a genesis json file. By default, this is used only if the DB is empty.",
+            help = "Optional genesis JSON (or path to a genesis JSON file). By default, this is used only if the DB is empty.",
         )]
-        genesis_file: Option<String>,
+        init: Option<String>,
         #[arg(
             long,
             default_value = None,
-            help = "Optional genesis json string. By default, this is used only if the DB is empty. Exactly one of genesis-json and genesis-file must be provided.",
-        )]
-        genesis_json: Option<String>,
-        #[arg(
-            long,
-            default_value = None,
-            help = "Whether to overwrite the DB with the genesis file data.",
+            help = "Whether to overwrite the DB with the init (genesis) file data.",
         )]
         force: bool,
     },
+    /// Start a local RPC server in background.
+    #[command(name = "server:start")]
+    ServerStart {},
     /// Dump a local RPC server std output.
     #[command(name = "server:dump")]
-    ServerDump {},
+    ServerDump {
+        /// Number of lines of the dump, which are shown.
+        #[arg(short, long, default_value_t = 128)]
+        lines: u32,
+        /// Show the whole dump.
+        #[arg(short, long, default_value_t = false)]
+        all: bool,
+    },
     /// Stop a local RPC server.
     #[command(name = "server:stop")]
     ServerStop {},

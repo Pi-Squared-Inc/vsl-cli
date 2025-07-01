@@ -42,7 +42,7 @@ pub enum RpcClientError {
     IncorrectRequest(String),
     #[error("Response is incorrect: {0}")]
     IncorrectResponse(String),
-    #[error("{0}")]
+    #[error("Connection error: {0}")]
     ConnectionError(#[from] ConnectionError),
     #[error("{0}")]
     GeneralError(String),

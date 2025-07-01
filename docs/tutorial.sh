@@ -13,7 +13,7 @@ vsl-cli config:create local_test --overwrite
 ## 🔌 Step 1: Connect to a Network
 # In case the VSL node is installed locally, start a local VSL node:
 
-vsl-cli server:launch --db tmp --genesis-file "genesis.json"
+vsl-cli server:launch --db tmp --init='{"accounts":[{"id":"0x749ab3318b74907f6e5856ce9ce1f3b55e3bb38a","balance":"1000000000000000000000000"}],"tokens":[]}' --force
 
 # Or use some external node, in case there's no local VSL node:
 # Uncomment these lines in case of remote network
@@ -26,7 +26,7 @@ vsl-cli server:launch --db tmp --genesis-file "genesis.json"
 vsl-cli health:check
 
 # initialize the master account (it should be one of the genesis accounts):
-vsl-cli account:load master -p 0xhex-private-key-of-master-account
+vsl-cli account:load master -p 0xb6dd863bea551b5bb27ce9917316a01ea4c331f24e0e4fe56e28eb430f175ed7
 
 ## 👤 Step 2: Create and Use an Account
 

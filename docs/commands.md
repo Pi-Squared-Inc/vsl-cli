@@ -563,11 +563,12 @@ vsl server:launch [OPTIONS]
 
 **Options:**
 - `--db <DB>` - Path to the VSL DB directory. If omitted, use the default. If the value is `tmp` - create a temporary directory (default: empty string)
+- `--init <genesis>` - Initialzes the DBs with initial pre-set accounts/balances. May be either a JSON object or a file, pointing to appropriate JSON object.
 - `--log-level <LOG_LEVEL>` - The logging level of an RPC server. One of: info, warn, error, ... (default: "info")
 
 **Example:**
 ```bash
-vsl server:launch --db "./my_db" --log-level "debug" --genesis-file "genesis.json"
+vsl server:launch --db "./my_db" --log-level "debug" --init "genesis.json"
 ```
 
 #### `server:dump`

@@ -4,17 +4,16 @@ use crate::accounts::private_key_to_signer;
 use crate::commands::Commands;
 use crate::configs::Config;
 use crate::configs::Configs;
-use crate::configs::RpcServer;
-use crate::configs::vsl_directory;
+use crate::configs::RpcServerInit;
 use crate::networks::Network;
 use crate::rpc_client::RpcClientError;
 use crate::rpc_client::RpcClientInterface;
 use crate::rpc_client::check_network_is_up;
-use crate::rpc_server::dump_server;
-use crate::rpc_server::start_server;
-use crate::rpc_server::stop_server;
+use crate::rpc_server::dump_local_server;
+use crate::rpc_server::init_local_server;
+use crate::rpc_server::start_local_server;
+use crate::rpc_server::stop_local_server;
 
-use alloy::signers::k256::elliptic_curve::generic_array;
 use jsonrpsee::core::params::ObjectParams;
 use log::info;
 use serde_json::Value;
@@ -534,12 +533,24 @@ pub fn execute_command<T: RpcClientInterface>(
             params.insert("asset_data", message_signed);
             let response = rpc_client.make_request(network, "vsl_createAsset", params)?;
             match response {
-                Value::String(ref asset_id) => {
-                    config.add_identifier(symbol, asset_id.clone())?;
-                    Ok(response)
-                }
+                Value::Object(ref map) => match map.get("asset_id") {
+                    Some(value) => match value {
+                        Value::String(asset_id) => {
+                            config.add_identifier(symbol, asset_id.clone())?;
+                            Ok(response)
+                        }
+                        _ => Err(RpcClientError::GeneralError(format!(
+                            "Field `asset_id` in response to `asset:create` must be a string, got: '{}'",
+                            response
+                        ))),
+                    },
+                    None => Err(RpcClientError::GeneralError(format!(
+                        "Response to `asset:create` must contain field asset_id, got: '{}'",
+                        response
+                    ))),
+                },
                 _ => Err(RpcClientError::GeneralError(format!(
-                    "Response to `asset:create` must be a asset_id (string), got: '{}'",
+                    "Response to `asset:create` must be an object, got: '{}'",
                     response
                 ))),
             }
@@ -732,23 +743,27 @@ pub fn execute_command<T: RpcClientInterface>(
                 ))),
             }
         }
-        Commands::ServerLaunch {
-            db,
-            log_level,
-            genesis_file,
-            genesis_json,
-            force,
-        } => {
-            if genesis_file.is_some() && genesis_json.is_some() {
-                return Err(RpcClientError::GeneralError(
-                    "You cannot use both `--genesis-file` and `--genesis-json` at the same time for server:launch.".to_string()
-                ));
-            } else if genesis_file.is_none() && genesis_json.is_none() {
-                return Err(RpcClientError::GeneralError(
-                    "You must use one of `--genesis-file` and `--genesis-json` for server:launch."
-                        .to_string(),
-                ));
-            }
+        Commands::ServerInit { db, init, force } => {
+            let init = match init {
+                Some(genesis) => {
+                    if std::fs::exists(&genesis).expect("failed to test on existance of a file") {
+                        // The `genesis` points to an existent file - decide that it's a file
+                        RpcServerInit::GenesisFile(genesis.clone())
+                    } else {
+                        let genesis = genesis.trim_matches('\'').trim_matches('"').trim();
+                        if genesis.starts_with("{") && genesis.ends_with("}") {
+                            // The `genesis` looks like a json object - decide that it's a json
+                            RpcServerInit::GenesisJson(genesis.to_string())
+                        } else {
+                            return Err(RpcClientError::GeneralError(format!(
+                                "The `--genesis` argument must be either a file or a json value, got: {}",
+                                genesis
+                            )));
+                        }
+                    }
+                }
+                None => RpcServerInit::None,
+            };
             let local_network = Network::default();
             if config.get_server().is_some() {
                 Ok(Value::String("Local RPC server is already up".to_string()))
@@ -756,62 +771,37 @@ pub fn execute_command<T: RpcClientInterface>(
                 Ok(Value::String("Local RPC server is already up".to_string()))
             } else {
                 info!("starting vsl-core (server)...");
-                let (new_server, opt_tempdir) = launch_server(
-                    config,
-                    db.clone(),
-                    log_level.clone(),
-                    genesis_file.clone(),
-                    genesis_json.clone(),
-                    *force,
-                )?;
-                // Check if it's up
-                if check_network_is_up(rpc_client, local_network) {
-                    let proc_id = new_server.pid;
-                    config.set_server(Some(new_server));
-                    if let Some(tempdir) = opt_tempdir {
-                        Ok(Value::String(format!(
-                            "Local RPC server is spawned, process id: {} created temp db directory: {}",
-                            proc_id,
-                            tempdir.keep().display()
-                        )))
-                    } else {
-                        Ok(Value::String(format!(
-                            "Local RPC server is spawned, process id: {}",
-                            proc_id
-                        )))
-                    }
+                let (new_server, opt_tempdir) = init_local_server(&db, init, *force)?;
+                config.set_server(Some(new_server));
+                if let Some(tempdir) = opt_tempdir {
+                    Ok(Value::String(format!(
+                        "Local RPC server is initialized and spawned, created temp db directory: {}",
+                        tempdir.keep().display()
+                    )))
                 } else {
-                    Err(RpcClientError::GeneralError(format!(
-                        "Failed to start RPC local server, proc id: {:?}",
-                        new_server.pid
+                    Ok(Value::String(format!(
+                        "Local RPC server is initialized and spawned"
                     )))
                 }
             }
         }
-        Commands::ServerDump {} => match config.get_server() {
-            Some(server) => match server.local {
-                Some(server) => {
-                    let output = dump_server(&server)?;
-                    Ok(Value::String(output))
-                }
-                None => Err(RpcClientError::GeneralError(format!(
-                    "Cannot dump stdout/strerr of a server {} because it was not launched by `vsl-cli`",
-                    server.pid
-                ))),
-            },
-            None => Err(RpcClientError::GeneralError(
-                "No local server is running".to_string(),
-            )),
-        },
-        Commands::ServerStop {} => match config.get_server() {
-            Some(server) => {
-                stop_server(&server).map_err(|e| {
-                    RpcClientError::GeneralError(format!("Failed to stop process: {}", e))
-                })?;
-                config.set_server(None);
-                Ok(Value::String("Local RPC server is stopped".to_string()))
+        Commands::ServerStart {} => {
+            let local_network = Network::default();
+            if check_network_is_up(rpc_client, local_network.clone()) {
+                Ok(Value::String("Local RPC server is already up".to_string()))
+            } else {
+                info!("starting vsl-core (server)...");
+                start_local_server()?;
+                Ok(Value::String(format!("Local RPC server is started")))
             }
-            None => Ok(Value::String("No local RPC server is running".to_string())),
+        }
+        Commands::ServerDump { lines, all } => Ok(Value::String(dump_local_server(*lines, *all)?)),
+        Commands::ServerStop {} => match stop_local_server() {
+            Ok(val) => Ok(Value::String(val)),
+            Err(err) => Err(RpcClientError::GeneralError(format!(
+                "Failed to stop process: {}",
+                err
+            ))),
         },
         Commands::Repl {
             print_commands,
@@ -899,26 +889,6 @@ pub fn execute_command<T: RpcClientInterface>(
             Ok(Value::String(format!("Configuration {} was removed", name)))
         }
     }
-}
-
-/// Starts the RPC server _and_ creates the master account with pre-defined funds.
-pub fn launch_server(
-    config: &mut Config,
-    db: String,
-    log_level: String,
-    genesis_file: Option<String>,
-    genesis_json: Option<String>,
-    force: bool,
-) -> Result<(RpcServer, Option<TempDir>), RpcClientError> {
-    let new_server: (RpcServer, Option<TempDir>) = start_server(
-        vsl_directory()?,
-        &db,
-        log_level.clone(),
-        genesis_file,
-        genesis_json,
-        force,
-    )?;
-    Ok(new_server)
 }
 
 /// Converts the argument, which may be hexadecimal or decimal to a hexadecimal representation

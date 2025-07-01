@@ -6,10 +6,6 @@
 
 A powerful command-line interface for interacting with the Verifiable Settlement Layer (VSL) network - Pi Squared's infrastructure for scalable, affordable, and customizable verifiability across Web3 protocols.
 
-## VSL deployment
-
-Please refer to [quick_start.md](./quick_start.md) file to learn how to run VSL locally or use public devnet RPC endpoint.
-
 ## Overview
 
 VSL CLI enables developers and users to interact with the VSL network through a comprehensive set of commands for:
@@ -21,6 +17,11 @@ VSL CLI enables developers and users to interact with the VSL network through a 
 - **Network Administration**: Connect to different VSL networks
 - **Configuration Management**: Manage multiple CLI configurations
 - **Development Tools**: Local server management and testing utilities
+
+## Prerequisites
+- Rust (v1.86 or newer) : install [Rust](https://rustup.rs)
+- Docker and Docker Compose : install [Docker](https://docs.docker.com/engine/install/)
+- A Linux (amd64) environment (Other environments and platforms are currently not supported)
 
 ## Quick Start
 
@@ -208,7 +209,7 @@ vsl-cli config:create production
 vsl-cli config:use development
 
 # Start local VSL server with temporary database
-vsl-cli server:launch --db tmp --log-level debug --genesis-file genesis.json
+vsl-cli server:launch --db tmp --log-level debug --init genesis.json
 
 # Create development account with initial balance
 vsl-cli account:create dev --balance 0x989680
