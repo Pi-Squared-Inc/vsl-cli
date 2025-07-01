@@ -17,10 +17,12 @@ use commands::Commands;
 use configs::CliMode;
 use configs::Config;
 use configs::Configs;
+use configs::RpcServer;
 use execute::execute_command;
 use rpc_client::RpcClient;
 use rpc_client::RpcClientError;
-use rpc_server::local_server_is_running;
+use rpc_server::check_server_is_alive;
+use rpc_server::try_to_find_server;
 use rustyline::ColorMode;
 use rustyline::Result as RustyResult;
 use rustyline::error::ReadlineError;
@@ -276,11 +278,22 @@ fn make_config(mode: CliMode) -> Result<Config> {
             match config.get_server() {
                 Some(server) => {
                     // In case server is not running - remove it
-                    if !local_server_is_running() {
+                    if !check_server_is_alive(&server) {
                         config.set_server(None);
+                        match try_to_find_server() {
+                            Some(pid) => config
+                                .set_server(Some(RpcServer { pid, local: None }))
+                                .context("Failed to set server A")?,
+                            None => {}
+                        }
                     }
                 }
-                None => {}
+                None => match try_to_find_server() {
+                    Some(pid) => config
+                        .set_server(Some(RpcServer { pid, local: None }))
+                        .context("Failed to set server B")?,
+                    None => {}
+                },
             }
         }
         CliMode::SingleCommand => {}

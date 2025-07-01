@@ -1,11 +1,9 @@
-use crate::configs::RpcServerInit;
+use crate::configs::RpcServer;
 use crate::configs::RpcServerLocal;
 
 use crate::networks::VSL_CLI_DEFAULT_NETWORK_PORT;
 use anyhow::Context;
 use anyhow::Result;
-use std::clone;
-use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::process::Command;
@@ -14,25 +12,29 @@ use std::time::SystemTime;
 use tempfile::TempDir;
 
 /// Starts the server in a separate child process.
+/// - vls_dir: the directory of the VSL repository/distribution
 /// - db_path: path to the VSL storage directory
-/// - init: the initial genesis JSON either as a string or as a file
 /// - log_level: one of RUST_LOG values - info, warn, error, etc....
 #[must_use]
-pub fn start_local_server(
+pub fn start_server(
+    vsl_dir: PathBuf,
     db: &String,
-    init: RpcServerInit,
+    log_level: String,
+    genesis_file: Option<String>,
+    genesis_json: Option<String>,
     force: bool,
-) -> Result<(RpcServerLocal, Option<TempDir>)> {
-    let vsl_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if !is_docker_installed() {
-        return Err(anyhow::anyhow!(
-            "'docker compose' is necessary to run RPC VSL server"
-        ));
-    }
+) -> Result<(RpcServer, Option<TempDir>)> {
+    let mut claim_db_path = String::new();
+    let mut tokens_db_path = String::new();
     let mut tempdir: Option<tempfile::TempDir> = None;
-    let mut db_dir = db.clone();
     if db == "tmp" {
-        // Create temporary directories for DB
+        if claim_db_path != "" || tokens_db_path != "" {
+            return Err(anyhow::anyhow!(
+                "Cannot use `--tmp` and `--claim-db-path` or `--tokens-db-path` at the same time"
+                    .to_string(),
+            ));
+        }
+        // Create temporary directories for DB and tokens
         let temp_dir = tempfile::TempDir::with_prefix("vsl-").map_err(|err| {
             anyhow::anyhow!(format!("Failed to create temporary directory: {}", err))
         })?;
@@ -40,321 +42,260 @@ pub fn start_local_server(
             "Temporary directory for VSL server: {}",
             temp_dir.path().to_str().unwrap()
         );
-        db_dir = temp_dir.path().to_str().unwrap_or("?").to_string();
+        claim_db_path = String::from(
+            temp_dir
+                .path()
+                .to_path_buf()
+                .join("vsl-db")
+                .to_str()
+                .ok_or(anyhow::anyhow!(
+                    "Failed to create temporary directory".to_string(),
+                ))?,
+        );
+        tokens_db_path = String::from(
+            temp_dir
+                .path()
+                .to_path_buf()
+                .join("tokens.db")
+                .to_str()
+                .ok_or(anyhow::anyhow!(
+                    "Failed to create temporary directory".to_string(),
+                ))?,
+        );
         tempdir = Some(temp_dir);
+    } else {
+        let claim_db_dir = PathBuf::from(db).join("vsl-db");
+        claim_db_path = String::from(claim_db_dir.to_str().ok_or(anyhow::anyhow!(
+            "Failed to get the vsl-db directory".to_string(),
+        ))?);
+        let token_db_dir = PathBuf::from(db).join("tokens.db");
+        tokens_db_path = String::from(token_db_dir.to_str().ok_or(anyhow::anyhow!(
+            "Failed to get the tokens.db directory".to_string(),
+        ))?);
     }
+    std::fs::create_dir_all(&claim_db_path).context("Failed to create claim DB directory")?;
+    std::fs::create_dir_all(&tokens_db_path).context("Failed to create tokens DB directory")?;
+    let log_path = vsl_dir.join("vsl-cli").join("logs");
+    std::fs::create_dir_all(log_path.clone()).context("Failed to create tokens logs directory")?;
 
-    make_dockerfile(db_dir, init, force)?;
-
-    // If the docker image was not yet downloaded - do it.
-    let pull_docker_image = Command::new("docker")
-        .current_dir(vsl_dir.clone())
-        .args(["compose", "-f", DOCKERFILE_NAME, "pull"])
-        .output()
-        .or(Err(anyhow::anyhow!(
-            "Failed to launch server in vsl directory: {}",
-            vsl_dir.to_str().unwrap_or("<unknown>")
-        )))?;
-    if !pull_docker_image.status.success() {
-        return Err(anyhow::anyhow!(
-            "Failed to download docker image of vsl-core: stderr:\n{}\nstdout:{}",
-            String::from_utf8(pull_docker_image.stderr).unwrap_or("?".to_string()),
-            String::from_utf8(pull_docker_image.stdout).unwrap_or("?".to_string()),
-        ));
+    let mut args = Vec::new();
+    if claim_db_path != "" {
+        args.push("--claim-db-path".to_string());
+        args.push(claim_db_path)
     }
-
+    if tokens_db_path != "" {
+        args.push("--tokens-db-path".to_string());
+        args.push(tokens_db_path)
+    }
+    if let Some(genesis_file) = genesis_file {
+        args.push("--genesis-file".to_string());
+        args.push(genesis_file);
+    }
+    if let Some(genesis_json) = genesis_json {
+        args.push("--genesis-json".to_string());
+        args.push(genesis_json);
+    }
+    if force {
+        args.push("--force".to_string());
+    }
     // Create timestamped log files
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)?
         .as_secs();
+    let stdout_path = log_path
+        .clone()
+        .join(format!("server-{}.stdout.log", timestamp));
+    let stderr_path = log_path
+        .clone()
+        .join(format!("server-{}.stderr.log", timestamp));
 
-    // Start the server in daemon mode.
-    let mut child = Command::new("docker")
+    // Create/open log files
+    let stdout_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&stdout_path)?;
+
+    let stderr_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&stderr_path)?;
+
+    let vsl_binary = "target/release/vsl-core";
+    //let vsl_binary = "target/debug/vsl-core";
+    let mut child = Command::new(vsl_binary)
         .current_dir(vsl_dir.clone())
-        .args(["compose", "-f", DOCKERFILE_NAME, "up", "-d"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .env("RUST_LOG", log_level)
+        .args(args.clone())
+        .stdout(Stdio::from(stdout_file))
+        .stderr(Stdio::from(stderr_file))
         .spawn()
         .or(Err(anyhow::anyhow!(
-            "Failed to launch server in vsl directory: {}",
+            "Failed to launch server {} in vsl directory: {}",
+            vsl_binary,
             vsl_dir.to_str().unwrap_or("<unknown>")
         )))?;
 
-    // Check the started server for the immediate failure.
-    let output = child.wait_with_output()?;
-    if !output.status.success() {
-        // Check on startup failure
-        return Err(anyhow::anyhow!(
-            "docker compose failed with exit code: {}\nstderr: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    let config = RpcServer {
+        pid: child.id(),
+        local: Some(RpcServerLocal {
+            command: vec!["target/release/vsl-core".to_string()]
+                .iter()
+                .chain(args.iter())
+                .cloned()
+                .collect(),
+            started: SystemTime::now(),
+            db_dir: PathBuf::from(db),
+            stdout: stdout_path,
+            stderr: stderr_path,
+        }),
+    };
 
-    // Initial wait for the server to start
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    // Wait for the server to start
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
-    // Wait for the server to be ready with proper health check
-    let max_attempts = 10;
-    let mut attempt = 0;
-
-    while attempt < max_attempts {
-        // Wait a little between attempts
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
-        // Test if server is responding
-        match std::process::Command::new("curl")
-            .args([
-                "-X",
-                "POST",
-                "-H",
-                "Content-Type: application/json",
-                "-d",
-                "{\"jsonrpc\":\"2.0\",\"id\":\"id\",\"method\":\"vsl_getHealth\"}",
-                "http://localhost:44444",
-            ])
-            .output()
-        {
-            Ok(output) if output.status.success() => {
-                return Ok((
-                    RpcServerLocal {
-                        command: Vec::new(),
-                        started: SystemTime::now(),
-                        db_dir: PathBuf::from(db),
-                    },
-                    tempdir,
-                ));
-            }
-            _ => attempt += 1,
-        }
-    }
-    Err(anyhow::anyhow!(
-        "Server failed to start within {} attempts to connect",
-        max_attempts
-    ))
-}
-
-fn make_dockerfile(db_dir: String, init: RpcServerInit, force: bool) -> Result<()> {
-    let vsl_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    let contents = DOCKERFILE_TEMPLATE
-        .replace("$DB_DIR", &db_dir)
-        .replace("$FORCE", if force { "- --force" } else { "" })
-        .replace(
-            "$GENESIS_COMMAND",
-            match &init {
-                RpcServerInit::GenesisFile(_) => "--genesis-file",
-                RpcServerInit::GenesisJson(_) => "--genesis-json",
-            },
-        )
-        .replace(
-            "$GENESIS_FILE",
-            match &init {
-                RpcServerInit::GenesisFile(file) => &file,
-                RpcServerInit::GenesisJson(_) => "./tests/genesis.json",
-            },
-        )
-        .replace(
-            "$GENESIS_VALUE",
-            match &init {
-                RpcServerInit::GenesisFile(_) => "/genesis.json",
-                RpcServerInit::GenesisJson(json) => json.trim_matches('\''),
-            },
-        );
-
-    let path = vsl_dir.join(DOCKERFILE_NAME);
-    if path.exists() {
-        let old_contents = String::from_utf8(std::fs::read(&path)?)?;
-        if contents == old_contents {
-            Ok(())
-        } else {
-            if force {
-                std::fs::write(path, contents);
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "Docker-compose file {} already exists. Use it or delete to re-create",
-                    DOCKERFILE_NAME
-                ))
-            }
-        }
+    if let Some(status) = child.try_wait()? {
+        Err(anyhow::anyhow!(
+            "Process exited immediately with status: {:?}",
+            status
+        ))
     } else {
-        std::fs::write(path, contents);
-        Ok(())
+        // Don't wait for the child - let it run in background
+        std::mem::forget(child);
+        Ok((config, tempdir))
     }
 }
 
 /// Stop server using system commands by a server PID.
-pub fn stop_local_server() -> Result<String> {
-    if !is_docker_installed() {
-        return Err(anyhow::anyhow!(
-            "No local RPC server is runnig - you need the `docker compose`  plugin installed for that"
-        ));
-    }
-    let vsl_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if !vsl_cli_dir.join(DOCKERFILE_NAME).exists() {
-        return Ok("No local RPC server is runnig".to_string());
-    }
-    match Command::new("docker")
-        .current_dir(vsl_cli_dir)
-        .args(["compose", "-f", DOCKERFILE_NAME, "down"])
-        .output()
-    {
-        Ok(out) => {
-            if out.status.success() {
-                Ok("Local RPC server is stopped".to_string())
-            } else {
-                Err(anyhow::anyhow!(
-                    "stopping server error:\n{:?}\n{:?}",
-                    String::from_utf8(out.stdout),
-                    String::from_utf8(out.stderr)
-                ))
-            }
-        }
-        Err(err) => Err(anyhow::anyhow!("{}", err)),
+pub fn stop_server(server: &RpcServer) -> Result<()> {
+    let output = if cfg!(target_os = "windows") {
+        Command::new("taskkill")
+            .args(["/F", "/PID", &server.pid.to_string()])
+            .output()?
+    } else {
+        Command::new("kill").arg(server.pid.to_string()).output()?
+    };
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Failed to kill process {}: {}",
+            server.pid,
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into())
     }
 }
 
 /// Dump both stdout and stderr with timestamps (if available)
-pub fn dump_local_server(lines: u32, all: bool) -> Result<String> {
-    if !is_docker_installed() {
-        return Err(anyhow::anyhow!(
-            "No local RPC server is running - you need the `docker compose` plugin installed for that"
-        ));
+pub fn dump_server(server: &RpcServerLocal) -> Result<String> {
+    let mut output = String::new();
+
+    output.push_str("=== STDOUT ===\n");
+    match std::fs::read_to_string(&server.stdout) {
+        Ok(stdout) => output.push_str(&stdout),
+        Err(e) => output.push_str(&format!("Error reading stdout: {}\n", e)),
     }
-    let vsl_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if !vsl_cli_dir.join(DOCKERFILE_NAME).exists() {
-        return Err(anyhow::anyhow!("No local RPC server is runnig"));
+
+    output.push_str("\n=== STDERR ===\n");
+    match std::fs::read_to_string(&server.stderr) {
+        Ok(stderr) => output.push_str(&stderr),
+        Err(e) => output.push_str(&format!("Error reading stderr: {}\n", e)),
     }
-    let make_output = |str: String| {
-        if all {
-            str
-        } else {
-            str.lines()
-                .rev()
-                .take(lines as usize)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
-    };
-    match Command::new("docker")
-        .current_dir(vsl_cli_dir)
-        .args(["compose", "-f", DOCKERFILE_NAME, "logs", "vsl-core"])
-        .output()
-    {
-        Ok(out) => {
-            if out.status.success() {
-                Ok(format!(
-                    "=== STDOUT ===\n{}\n=== STDERR ===\n{}",
-                    make_output(String::from_utf8(out.stdout)?),
-                    make_output(String::from_utf8(out.stderr)?),
-                ))
-            } else {
-                Err(anyhow::anyhow!(
-                    "dumping server error:\n{:?}\n{:?}",
-                    String::from_utf8(out.stdout),
-                    String::from_utf8(out.stderr)
-                ))
-            }
-        }
-        Err(err) => Err(anyhow::anyhow!("{}", err)),
-    }
+
+    Ok(output)
 }
 
 /// Check if a server is still running
-pub fn local_server_is_running() -> bool {
-    let vsl_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if !is_docker_installed() || !vsl_cli_dir.join(DOCKERFILE_NAME).exists() {
-        return false;
+pub fn check_server_is_alive(server: &RpcServer) -> bool {
+    if cfg!(target_os = "windows") {
+        // Windows: Use tasklist
+        Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", server.pid), "/FO", "CSV"])
+            .output()
+            .map(|output| {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                stdout.lines().count() > 1 // Header + process line if exists
+            })
+            .unwrap_or(false)
+    } else {
+        // Unix-like: Use kill -0
+        Command::new("kill")
+            .args(["-0", &server.pid.to_string()])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
     }
-    // Command: `docker ps`
-    match Command::new("docker")
-        .current_dir(vsl_cli_dir)
-        .args(["compose", "-f", DOCKERFILE_NAME, "ps"])
-        .output()
-    {
-        Ok(out) => {
-            if out.status.success() {
-                match String::from_utf8(out.stdout) {
-                    Ok(stdout) => {
-                        for line in stdout.lines() {
-                            if line.contains("vsl-core") && line.contains("(healthy)") {
-                                return true;
-                            }
-                        }
-                        false
+}
+
+pub fn try_to_find_server() -> Option<u32> {
+    // Try netstat first
+    if let Some(pid) = try_netstat() {
+        return Some(pid);
+    }
+    // If netstat failed and we're on Linux, try ss
+    if cfg!(target_os = "linux") {
+        if let Some(pid) = try_ss() {
+            return Some(pid);
+        }
+    }
+    None
+}
+
+fn try_netstat() -> Option<u32> {
+    let output = if cfg!(target_os = "windows") {
+        Command::new("netstat").args(["-ano"]).output().ok()?
+    } else {
+        Command::new("netstat").args(["-tlnp"]).output().ok()?
+    };
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    for line in stdout.lines() {
+        if line.contains(&format!(":{}", VSL_CLI_DEFAULT_NETWORK_PORT)) {
+            if cfg!(target_os = "windows") {
+                // Windows netstat format: TCP    0.0.0.0:8080    0.0.0.0:0    LISTENING    1234
+                if let Some(pid_str) = line.split_whitespace().last() {
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        return Some(pid);
                     }
-                    Err(_) => false,
                 }
             } else {
-                false
+                // Linux netstat format: tcp 0 0 0.0.0.0:8080 0.0.0.0:* LISTEN 1234/program
+                if let Some(last_part) = line.split_whitespace().last() {
+                    if let Some(pid_str) = last_part.split('/').next() {
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            return Some(pid);
+                        }
+                    }
+                }
             }
         }
-        Err(err) => false,
     }
+
+    None
 }
 
-fn is_docker_installed() -> bool {
-    Command::new("docker")
-        .args(["compose", "--help"])
-        .output()
-        .map_or(false, |output| output.status.success())
+fn try_ss() -> Option<u32> {
+    // ss command with -tlnp flags: -t (TCP), -l (listening), -n (numeric), -p (process info)
+    let output = Command::new("ss").args(["-tlnp"]).output().ok()?;
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    for line in stdout.lines() {
+        if line.contains(&format!(":{}", VSL_CLI_DEFAULT_NETWORK_PORT)) {
+            // ss format: LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:(("program",pid=1234,fd=3))
+            // Look for users:((program,pid=NUMBER,fd=N))
+            if let Some(users_part) = line.split("users:((").nth(1) {
+                if let Some(process_info) = users_part.split("))").next() {
+                    // Extract pid from format like "program",pid=1234,fd=3
+                    for part in process_info.split(',') {
+                        if part.starts_with("pid=") {
+                            if let Ok(pid) = part[4..].parse::<u32>() {
+                                return Some(pid);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
-
-const DOCKERFILE_NAME: &str = "docker-compose.public.local.yml";
-
-const DOCKERFILE_TEMPLATE: &str = r#"
-services:
-  vsl-core:
-    image: ghcr.io/pi-squared-inc/vsl/vsl-core:main
-    ports:
-      - "44444:44444"
-    command:
-        - $GENESIS_COMMAND
-        - '$GENESIS_VALUE'
-        - "--claim-db-path"
-        - "/var/lib/vsl/vsl-db"
-        - "--tokens-db-path"
-        - "/var/lib/vsl/tokens.db"
-        $FORCE
-    healthcheck:
-      test:
-        - "CMD"
-        - "curl"
-        - "-X"
-        - "POST"
-        - "-H"
-        - "Content-Type: application/json"
-        - "-d"
-        - '{"jsonrpc":"2.0","id":"id","method":"vsl_getHealth"}'
-        - "http://localhost:44444"
-      interval: 1s
-      timeout: 5s
-      retries: 30
-    volumes:
-      - $DB_DIR:/var/lib/vsl
-      - $GENESIS_FILE:/genesis.json:ro
-
-  explorer-backend:
-    image: ghcr.io/pi-squared-inc/vsl/explorer-backend:main
-    network_mode: host
-    depends_on:
-      vsl-core:
-        condition: service_healthy
-    volumes:
-      - explorer-data:/var/lib/vsl/explorer
-
-  explorer-frontend:
-    image: ghcr.io/pi-squared-inc/vsl/explorer-frontend:main
-    ports:
-      - "4000:4000"
-    depends_on:
-      vsl-core:
-        condition: service_healthy
-
-volumes:
-  explorer-data:
-"#;

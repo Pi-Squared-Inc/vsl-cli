@@ -1,30 +1,27 @@
 #![allow(unused)]
 
 use std::fs::File;
-use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time;
 
 #[test]
 fn test_cli_end_to_end_batch() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Make sure that `vsl-core` - the server - is built.
+    Command::new("cargo")
+        .current_dir("../vsl-core")
+        .args(["build", "--release"])
+        .output()
+        .expect("failed to build vsl-core (RPC server)");
+
     // VSL_CLI_PRINT_COMMANDS=1 VSL_CLI_PERSISTENT_CONFIG=0 ./cli.sh repl < ../vsl-cli/tests/batch_commands
-    let batch_file = File::open(dir.join("tests").join("batch_commands"))
+    let batch_file = File::open("../vsl-cli/tests/batch_commands")
         .expect("Failed to open the batch command file");
     let error_prefix = "CLI Error";
-    //let output = Command::new(dir.join("target").join("debug").join("vsl-cli"))
-    let output = Command::new("cargo")
+    let output = Command::new("../target/debug/vsl-cli")
         .env("RUST_LOG", "info")
         .env("VSL_CLI_ERROR_PREFIX", error_prefix)
-        .args([
-            "run",
-            "-p",
-            "vsl-cli",
-            "repl",
-            "--print-commands",
-            "--tmp-config",
-        ])
+        .args(["repl", "--print-commands", "--tmp-config"])
         .stdin(batch_file)
         .output()
         .expect("failed to execute CLI batch file");
@@ -48,7 +45,7 @@ fn test_cli_end_to_end_batch() {
     for must_have in vec![
         "Welcome to vsl-cli REPL.",
         "The configuration local_test is created",
-        "Local RPC server is spawned",
+        "Local RPC server is spawned, process id:",
         "vsl> health:check\nok",
         "Available networks:\n  default - http://localhost:44444 -- up",
         "Account acc1 is created, address:",

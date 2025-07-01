@@ -1,11 +1,3 @@
-
-####################################
-##
-## Run tests with --genesis-json
-##
-####################################
-
-
 network:list
 network:current
 # Stop a probably running local RPC server
@@ -14,20 +6,16 @@ server:stop
 config:create local_test --overwrite
 config:use local_test
 network:list
+network:current
 
 # Start a fresh new one
-server:launch --db=tmp --genesis-json='{"accounts":[{"id":"0x749ab3318b74907f6e5856ce9ce1f3b55e3bb38a","balance":"1000000000000000000000000"}],"tokens":[]}' --force
-network:current
-server:dump
-
+server:launch --db=tmp --genesis-file=vsl-cli/tests/genesis.json --force
 account:load master -p 0xb6dd863bea551b5bb27ce9917316a01ea4c331f24e0e4fe56e28eb430f175ed7
 account:current
 account:balance
 account:export
 network:list
 network:current
-
-server:dump
 
 health:check
 
@@ -169,190 +157,7 @@ claim:settled
 claim:submitted
 
 health:check
-
-server:dump
-
 # Stop the test local RPC server
 server:stop
 
 config:remove local_test
-
-
-####################################
-##
-## Repeat tests with --genesis-file
-##
-####################################
-
-network:list
-network:current
-# Stop a probably running local RPC server
-server:stop
-
-config:create local_test --overwrite
-config:use local_test
-network:list
-network:current
-
-# Start a fresh new one
-server:launch --db=tmp --genesis-file=./tests/genesis.json --force
-
-server:dump
-
-account:load master -p 0xb6dd863bea551b5bb27ce9917316a01ea4c331f24e0e4fe56e28eb430f175ed7
-account:current
-account:balance
-account:export
-network:list
-network:current
-
-server:dump
-
-health:check
-
-account:list
-
-account:create acc1
-account:use master
-pay --to acc1 --amount 1000
-account:use acc1
-account:balance
-account:export
-
-account:create acc2
-account:use master
-pay --to acc2 --amount 1000
-account:use acc2
-account:balance
-account:export
-
-account:create acc3
-account:use master
-pay --to acc3 --amount 1000
-account:use acc3
-account:balance
-account:export
-
-account:remove acc3
-account:use acc2
-
-account:state-get
-account:state-set 0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-account:state-get
-#account:state-set invalid_state
-
-account:use acc1
-asset:create --symbol x_as1 --supply 0x100 --decimals 8
-account:balance
-asset:create --symbol x_as2 --supply 300 --decimals 8
-account:balance
-
-account:use acc2
-asset:create --symbol y_as1 --supply 0x200 --decimals 8
-account:balance
-asset:create --symbol y_as2 --supply 400 --decimals 8
-account:balance
-
-account:use acc1
-asset:get x_as1
-asset:get x_as2
-asset:get y_as1
-asset:get y_as2
-asset:balances
-
-account:use acc2
-asset:get x_as1
-asset:get x_as2
-asset:get y_as1
-asset:get y_as2
-asset:balances
-
-account:use acc1
-asset:transfer --asset x_as1 --to acc2 --amount 0x5
-account:balance
-asset:transfer --asset x_as2 --to acc2 --amount 7
-account:balance
-
-#
-#   Uncommenting these transfers leads to errors!
-#
-#asset:transfer --asset y_as1 --to acc2 --amount 5
-#asset:transfer --asset y_as2 --to acc2 --amount 7
-
-account:use acc2
-asset:transfer --asset x_as1 --to acc1 --amount 0x5
-asset:transfer --asset x_as2 --to acc1 --amount 7
-asset:transfer --asset y_as1 --to acc1 --amount 0x12
-asset:transfer --asset y_as2 --to acc1 --amount 13
-
-account:use acc1
-account:balance
-pay --to acc2 --amount 0x100
-
-health:check
-
-account:use acc2
-account:balance
-pay --to acc1 --amount 140
-
-
-
-account:balance
-claim:submit xxx
-claim:submit 'one Ring to rule them All??...'
-
-claim:settle xxx
-claim:get xxx
-claim:settle 'one Ring to rule them All??...'
-claim:get 'one Ring to rule them All??...'
-
-
-
-account:use acc1
-account:balance
-claim:submit AAA
-claim:submit AAA1 --type int --proof true --lifetime 123456 --fee 0x10
-claim:submit 'one Ring to rule them All'
-
-claim:settle AAA
-claim:settle AAA1
-claim:settle 'one Ring to rule them All'
-claim:get AAA
-claim:get AAA1
-claim:get 'one Ring to rule them All'
-
-claim:settled -a acc1
-claim:submitted -a acc1
-claim:settled -a acc2
-claim:submitted -a acc2
-
-claim:settled
-claim:submitted
-
-account:use acc2
-account:balance
-claim:submit BBB
-claim:submit BB --type int --proof true --lifetime 123456 --fee 15
-claim:submit 'the other Ring to rule them All'
-
-claim:settle BBB
-claim:settle BB
-claim:settle 'the other Ring to rule them All'
-claim:get BBB
-claim:settled -a acc1
-claim:submitted -a acc1
-claim:settled -a acc2
-claim:submitted -a acc2
-
-claim:settled
-claim:submitted
-
-health:check
-
-server:dump
-
-# Stop the test local RPC server
-server:stop
-
-config:remove local_test
-

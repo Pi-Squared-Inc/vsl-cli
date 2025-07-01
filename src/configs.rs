@@ -27,6 +27,10 @@ pub const VSL_TMP_CONFIG: &str = "tmp";
 /// Data about an instance of `vsl-core`, launched within `vsl-cli`
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RpcServerLocal {
+    /// The path to the standard output of a server
+    pub stdout: PathBuf,
+    /// The path to the standard error output of a server
+    pub stderr: PathBuf,
     /// Timestamp, when a server was started
     pub started: SystemTime,
     /// The exact command, by which a server was launched
@@ -35,12 +39,13 @@ pub struct RpcServerLocal {
     pub db_dir: PathBuf,
 }
 
-/// The way RPC server is initialized
-pub enum RpcServerInit {
-    /// When an initial genesis config is passed as a file
-    GenesisFile(String),
-    /// When an initial genesis config is passed as a JSON value
-    GenesisJson(String),
+/// The local server instance, identified by its PID.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RpcServer {
+    /// The process identifier
+    pub pid: u32,
+    /// In case a server is started by `vsl-cli`, the metadata about the server
+    pub local: Option<RpcServerLocal>,
 }
 
 /// The mode of `vsl-cli` running.
@@ -70,7 +75,7 @@ pub struct Config {
     /// Collection of submitted, but not yet settled claims
     pub submitted: HashMap<String, SubmittedClaim>,
     /// If a local server was started via `vsl-cli`, the info about it is stored here.
-    pub server: Option<RpcServerLocal>,
+    pub server: Option<RpcServer>,
     /// The flag of being in REPL mode
     #[serde(skip, default = "default_mode")]
     pub mode: CliMode,
@@ -430,11 +435,11 @@ impl Config {
     }
 
     // Server getter - just a wrapper
-    pub fn get_server(&mut self) -> Option<RpcServerLocal> {
+    pub fn get_server(&mut self) -> Option<RpcServer> {
         self.server.clone()
     }
     // Server setter - saves the config, if called.
-    pub fn set_server(&mut self, server: Option<RpcServerLocal>) -> Result<()> {
+    pub fn set_server(&mut self, server: Option<RpcServer>) -> Result<()> {
         self.server = server;
         self.save()
     }
@@ -538,5 +543,20 @@ pub fn vsl_config_dir() -> Result<PathBuf> {
             Ok(path)
         }
         None => Err(anyhow::anyhow!("vsl config directory is not found")),
+    }
+}
+
+/// The `vsl` repository/installation.
+pub fn vsl_directory() -> Result<PathBuf> {
+    let mut current_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    loop {
+        let vsl_path = current_dir.join("vsl");
+        if vsl_path.exists() && vsl_path.is_dir() {
+            return Ok(vsl_path);
+        }
+        current_dir = current_dir
+            .parent()
+            .ok_or(anyhow::anyhow!("vsl installation directory is not found"))?
+            .to_path_buf();
     }
 }
