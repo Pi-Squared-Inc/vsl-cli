@@ -48,7 +48,7 @@ vsl-cli account:balance
 vsl-cli claim:submit "User verification completed" --type "kyc" --fee 0x1
 
 # Start local development server
-vsl-cli server:launch --db tmp
+vsl-cli server:init --db tmp
 ```
 
 ## Core Concepts
@@ -123,7 +123,8 @@ vsl-cli pay --to <address> --amount <amt> # Transfer funds
 
 ### 🖥️ Server Management
 ```bash
-vsl-cli server:launch                  # Start local VSL server
+vsl-cli server:init                    # Initialize and start local VSL server
+vsl-cli server:start                   # Start local VSL server
 vsl-cli server:stop                    # Stop local server
 vsl-cli server:dump                    # View server logs
 ```
@@ -208,8 +209,8 @@ vsl-cli config:create production
 # Switch to development configuration
 vsl-cli config:use development
 
-# Start local VSL server with temporary database
-vsl-cli server:launch --db tmp --log-level debug --init genesis.json
+# Initialize and start local VSL server with temporary database
+vsl-cli server:init --db tmp --log-level debug --init genesis.json
 
 # Create development account with initial balance
 vsl-cli account:create dev --balance 0x989680
@@ -480,7 +481,6 @@ cargo test --test end_to_end_separate
 # Stress testing
 To run stress tests, do:
 ```bash
-cargo build --release
 ulimit -n 1000000
 cargo run --release --example stress_test
 ```

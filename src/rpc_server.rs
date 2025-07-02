@@ -46,21 +46,49 @@ pub fn init_local_server(
 
     make_dockerfile(&db_dir, init, force)?;
 
-    // If the docker image was not yet downloaded - do it.
-    let pull_docker_image = Command::new("docker")
-        .current_dir(vsl_dir.clone())
-        .args(["compose", "-f", DOCKERFILE_NAME, "pull"])
-        .output()
-        .or(Err(anyhow::anyhow!(
-            "Failed to launch server in vsl directory: {}",
-            vsl_dir.to_str().unwrap_or("<unknown>")
-        )))?;
-    if !pull_docker_image.status.success() {
-        return Err(anyhow::anyhow!(
-            "Failed to download docker image of vsl-core: stderr:\n{}\nstdout:{}",
-            String::from_utf8(pull_docker_image.stderr).unwrap_or("?".to_string()),
-            String::from_utf8(pull_docker_image.stdout).unwrap_or("?".to_string()),
-        ));
+    // If the docker image was not yet downloaded or created - do it.
+    if unsafe { DOCKERFILE_IMAGE } == DOCKERFILE_IMAGE_REMOTE {
+        // The case of remote `vsl-core` docker image
+        let pull_docker_image = Command::new("docker")
+            .current_dir(vsl_dir.clone())
+            .args(["compose", "-f", DOCKERFILE_NAME, "pull"])
+            .output()
+            .or(Err(anyhow::anyhow!(
+                "Failed to launch docker in vsl directory: {}",
+                vsl_dir.to_str().unwrap_or("<unknown>")
+            )))?;
+        if !pull_docker_image.status.success() {
+            return Err(anyhow::anyhow!(
+                "Failed to download docker image of vsl-core: stderr:\n{}\nstdout:{}",
+                String::from_utf8(pull_docker_image.stderr).unwrap_or("?".to_string()),
+                String::from_utf8(pull_docker_image.stdout).unwrap_or("?".to_string()),
+            ));
+        }
+    } else {
+        // The case of local `vsl-core` docker image - used for testing: `docker build -t vsl-core:local .`
+        let create_docker_image = Command::new("docker")
+            .current_dir(vsl_dir.join(".."))
+            .env("DOCKER_BUILDKIT", "1")
+            .args([
+                "build",
+                "-f",
+                "vsl-core/Dockerfile",
+                "-t",
+                DOCKERFILE_IMAGE_LOCAL,
+                ".",
+            ])
+            .output()
+            .or(Err(anyhow::anyhow!(
+                "Failed to launch docker in vsl directory: {}",
+                vsl_dir.to_str().unwrap_or("<unknown>")
+            )))?;
+        if !create_docker_image.status.success() {
+            return Err(anyhow::anyhow!(
+                "Failed to build docker image of vsl-core: stderr:\n{}\nstdout:{}",
+                String::from_utf8(create_docker_image.stderr).unwrap_or("?".to_string()),
+                String::from_utf8(create_docker_image.stdout).unwrap_or("?".to_string()),
+            ));
+        }
     }
 
     // Start the server
@@ -163,7 +191,7 @@ fn make_dockerfile(db_dir: &String, init: RpcServerInit, force: bool) -> Result<
         RpcServerInit::None => String::new(),
     };
 
-    let contents = DOCKERFILE_TEMPLATE
+    let contents = choose_dockerfile_template()
         .replace("$DB_DIR", db_dir)
         .replace("$FORCE", if force { "- \"--force\"" } else { "" })
         // - --genesis
@@ -192,9 +220,11 @@ fn make_dockerfile(db_dir: &String, init: RpcServerInit, force: bool) -> Result<
                 RpcServerInit::GenesisJson(json) => &genesis_json_replacement,
                 RpcServerInit::None => "",
             },
-        );
+        )
+        .replace("$VSL_CORE_IMAGE", unsafe { DOCKERFILE_IMAGE });
 
     std::fs::write(vsl_dir.join(DOCKERFILE_NAME), contents);
+
     Ok(())
 }
 
@@ -319,11 +349,23 @@ fn is_docker_installed() -> bool {
 }
 
 const DOCKERFILE_NAME: &str = "docker-compose.local.yml";
+pub const DOCKERFILE_IMAGE_REMOTE: &str = "ghcr.io/pi-squared-inc/vsl/vsl-core:main";
+pub const DOCKERFILE_IMAGE_LOCAL: &str = "vsl-core:local";
 
-const DOCKERFILE_TEMPLATE: &str = r#"
+pub static mut DOCKERFILE_IMAGE: &'static str = DOCKERFILE_IMAGE_REMOTE;
+
+fn choose_dockerfile_template() -> &'static str {
+    if unsafe { DOCKERFILE_IMAGE } == DOCKERFILE_IMAGE_REMOTE {
+        DOCKERFILE_TEMPLATE_REMOTE
+    } else {
+        DOCKERFILE_TEMPLATE_LOCAL
+    }
+}
+
+const DOCKERFILE_TEMPLATE_REMOTE: &str = r#"
 services:
   vsl-core:
-    image: ghcr.io/pi-squared-inc/vsl/vsl-core:main
+    image: $VSL_CORE_IMAGE
     ports:
       - "44444:44444"
     stop_grace_period: 1s
@@ -332,6 +374,58 @@ services:
         - "/var/lib/vsl/vsl-db"
         - "--tokens-db-path"
         - "/var/lib/vsl/tokens.db"
+        $GENESIS_COMMAND
+        $GENESIS_VALUE
+        $FORCE
+    healthcheck:
+      test:
+        - "CMD"
+        - "curl"
+        - "-X"
+        - "POST"
+        - "-H"
+        - "Content-Type: application/json"
+        - "-d"
+        - '{"jsonrpc":"2.0","id":"id","method":"vsl_getHealth"}'
+        - "http://localhost:44444"
+      interval: 1s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - $DB_DIR:/var/lib/vsl
+      $GENESIS_FILE
+
+  explorer-backend:
+    image: ghcr.io/pi-squared-inc/vsl/explorer-backend:main
+    network_mode: host
+    depends_on:
+      vsl-core:
+        condition: service_healthy
+    volumes:
+      - explorer-data:/var/lib/vsl/explorer
+
+  explorer-frontend:
+    image: ghcr.io/pi-squared-inc/vsl/explorer-frontend:main
+    ports:
+      - "4000:4000"
+    depends_on:
+      vsl-core:
+        condition: service_healthy
+
+volumes:
+  explorer-data:
+"#;
+
+const DOCKERFILE_TEMPLATE_LOCAL: &str = r#"
+services:
+  vsl-core:
+    image: $VSL_CORE_IMAGE
+    ports:
+      - "44444:44444"
+    stop_grace_period: 1s
+    command:
+        - "--db-path"
+        - "/var/lib/vsl/vsl-db"
         $GENESIS_COMMAND
         $GENESIS_VALUE
         $FORCE

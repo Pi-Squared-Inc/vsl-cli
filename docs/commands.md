@@ -558,7 +558,7 @@ Start a local RPC server in background.
 
 **Usage:**
 ```bash
-vsl server:launch [OPTIONS]
+vsl server:init [OPTIONS]
 ```
 
 **Options:**
@@ -568,7 +568,15 @@ vsl server:launch [OPTIONS]
 
 **Example:**
 ```bash
-vsl server:launch --db "./my_db" --log-level "debug" --init "genesis.json"
+vsl server:init --db "./my_db" --log-level "debug" --init "genesis.json"
+```
+
+#### `server:start`
+Starts a local RPC server, which was previously initialized with `server:init` command.
+
+**Usage:**
+```bash
+vsl server:start
 ```
 
 #### `server:dump`

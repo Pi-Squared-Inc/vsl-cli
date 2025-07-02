@@ -756,7 +756,7 @@ pub fn execute_command<T: RpcClientInterface>(
                             RpcServerInit::GenesisJson(genesis.to_string())
                         } else {
                             return Err(RpcClientError::GeneralError(format!(
-                                "The `--genesis` argument must be either a file or a json value, got: {}",
+                                "The `--init` argument must be either a file or a json value, got: {}",
                                 genesis
                             )));
                         }
