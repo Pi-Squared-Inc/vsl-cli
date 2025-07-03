@@ -9,6 +9,8 @@ use crate::networks::Network;
 use crate::rpc_client::RpcClientError;
 use crate::rpc_client::RpcClientInterface;
 use crate::rpc_client::check_network_is_up;
+use crate::rpc_server::DOCKERFILE_IMAGE;
+use crate::rpc_server::DOCKERFILE_IMAGE_LOCAL;
 use crate::rpc_server::dump_local_server;
 use crate::rpc_server::init_local_server;
 use crate::rpc_server::start_local_server;
@@ -18,7 +20,9 @@ use jsonrpsee::core::params::ObjectParams;
 use log::info;
 use serde_json::Value;
 use serde_json::json;
+use std::str::FromStr as _;
 use tempfile::TempDir;
+use vsl_sdk::Address;
 use vsl_sdk::IntoSigned as _;
 use vsl_sdk::Timestamp;
 use vsl_sdk::rpc_messages::CreateAssetMessage;
@@ -32,6 +36,7 @@ use vsl_sdk::rpc_messages::Timestamped;
 use vsl_sdk::rpc_messages::TransferAssetMessage;
 use vsl_sdk::rpc_messages::ValidatorVerifiedClaim;
 use vsl_sdk::rpc_messages::VerifiedClaim;
+use vsl_sdk::rpc_messages::VslAddress;
 
 pub fn execute_command<T: RpcClientInterface>(
     config: &mut Config,
@@ -93,9 +98,13 @@ pub fn execute_command<T: RpcClientInterface>(
                 claim_type: claim_type.clone(),
                 proof: proof.clone(),
                 nonce: nonce.to_string(),
-                to: account.signatures.clone(),
+                to: account
+                    .signatures
+                    .iter()
+                    .map(|addr| VslAddress::from_str(addr).unwrap())
+                    .collect(),
                 quorum: account.quorum,
-                from: account.credentials.address,
+                from: VslAddress::from_str(&account.credentials.address).unwrap(),
                 expires: Timestamp::from_seconds(expires),
                 fee: to_hex(fee)?,
             };
@@ -131,10 +140,13 @@ pub fn execute_command<T: RpcClientInterface>(
             let network = config.get_network(network.clone())?;
             let nonce = rpc_client.get_nonce(network.clone(), &address)?;
             let submitted = config.get_claim(claim)?;
-            let target_claim_id =
-                VerifiedClaim::claim_id_hash(&submitted.from, &submitted.nonce, &submitted.claim);
+            let target_claim_id = VerifiedClaim::claim_id_hash(
+                &submitted.from.address,
+                &submitted.nonce,
+                &submitted.claim,
+            );
             let message = SettleClaimMessage {
-                from: address,
+                from: VslAddress::from_str(&address).unwrap(),
                 nonce: nonce.to_string(),
                 target_claim_id: target_claim_id.to_string(),
             };
@@ -276,8 +288,8 @@ pub fn execute_command<T: RpcClientInterface>(
             let network = config.get_network(network.clone())?;
             let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let pay_message = PayMessage {
-                from: account.credentials.address,
-                to: config.lookup_address(&to)?,
+                from: VslAddress::from_str(&account.credentials.address).unwrap(),
+                to: VslAddress::from_str(&(config.lookup_address(&to)?)).unwrap(),
                 amount: to_hex(amount)?,
                 nonce: nonce.to_string(),
             };
@@ -385,7 +397,7 @@ pub fn execute_command<T: RpcClientInterface>(
                 account.credentials.address
             );
             let message = SetStateMessage {
-                from: account.credentials.address.clone(),
+                from: VslAddress::from_str(&account.credentials.address).unwrap(),
                 state: state.clone(),
                 nonce: nonce.to_string(),
             };
@@ -521,7 +533,7 @@ pub fn execute_command<T: RpcClientInterface>(
             let network = config.get_network(network.clone())?;
             let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let message = CreateAssetMessage {
-                account_id: account.credentials.address,
+                account_id: VslAddress::from_str(&account.credentials.address).unwrap(),
                 nonce: nonce.to_string(),
                 ticker_symbol: symbol.clone(),
                 decimals: u8::from_str_radix(&decimals, 10).unwrap(),
@@ -566,8 +578,8 @@ pub fn execute_command<T: RpcClientInterface>(
             let nonce = rpc_client.get_nonce(network.clone(), &account.credentials.address)?;
             let message = TransferAssetMessage {
                 asset_id: config.lookup_identifier(asset)?,
-                from: account.credentials.address,
-                to: config.lookup_address(&to)?,
+                from: VslAddress::from_str(&account.credentials.address).unwrap(),
+                to: VslAddress::from_str(&(config.lookup_address(&to)?)).unwrap(),
                 amount: to_hex(amount)?,
                 nonce: nonce.to_string(),
             };
@@ -743,7 +755,17 @@ pub fn execute_command<T: RpcClientInterface>(
                 ))),
             }
         }
-        Commands::ServerInit { db, init, force } => {
+        Commands::ServerInit {
+            db,
+            init,
+            force,
+            local_docker,
+        } => {
+            if *local_docker {
+                unsafe {
+                    DOCKERFILE_IMAGE = DOCKERFILE_IMAGE_LOCAL;
+                }
+            }
             let init = match init {
                 Some(genesis) => {
                     if std::fs::exists(&genesis).expect("failed to test on existance of a file") {
@@ -806,6 +828,7 @@ pub fn execute_command<T: RpcClientInterface>(
         Commands::Repl {
             print_commands,
             tmp_config,
+            local_docker,
         } => Err(RpcClientError::GeneralError(
             "Cannot start REPL from within REPL".to_string(),
         )),

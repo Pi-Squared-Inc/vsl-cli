@@ -1,10 +1,12 @@
 #![allow(unused)]
 
+use std::str::FromStr as _;
 use vsl_cli::commands::Commands;
 use vsl_cli::configs::CliMode;
 use vsl_cli::configs::Configs;
 use vsl_cli::execute::execute_command;
 use vsl_cli::rpc_client::RpcClient;
+use vsl_sdk::Address;
 use vsl_sdk::rpc_messages::IdentifiableClaim as _;
 use vsl_sdk::rpc_messages::VerifiedClaim;
 
@@ -35,7 +37,12 @@ fn test_endpoints() -> anyhow::Result<()> {
     });
     exec_command(Commands::ClaimGet {
         network: None,
-        id: VerifiedClaim::claim_id_hash(CLIENT, "1234", "***All men are liars").to_string(),
+        id: VerifiedClaim::claim_id_hash(
+            &Address::from_str(CLIENT).unwrap(),
+            "1234",
+            "***All men are liars",
+        )
+        .to_string(),
     });
     Ok(())
 }

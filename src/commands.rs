@@ -358,6 +358,9 @@ pub enum Commands {
             help = "Whether to overwrite the DB with the init (genesis) file data.",
         )]
         force: bool,
+        /// Use local docker images.
+        #[arg(long, default_value_t = false)]
+        local_docker: bool,
     },
     /// Start a local RPC server in background.
     #[command(name = "server:start")]
@@ -383,6 +386,9 @@ pub enum Commands {
         /// Use a temporary empty config, which won't be saved and affect the persistent config.
         #[arg(long, default_value_t = false)]
         tmp_config: bool,
+        /// Use local docker images.
+        #[arg(long, default_value_t = false)]
+        local_docker: bool,
     },
     /// Create a new configuration.
     #[command(name = "config:create")]

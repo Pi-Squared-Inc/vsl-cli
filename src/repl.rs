@@ -8,6 +8,8 @@ use crate::configs::Configs;
 use crate::execute::execute_command;
 use crate::rpc_client::RpcClient;
 use crate::rpc_client::RpcClientError;
+use crate::rpc_server::DOCKERFILE_IMAGE;
+use crate::rpc_server::DOCKERFILE_IMAGE_LOCAL;
 use crate::rpc_server::local_server_is_running;
 use anyhow::Context;
 use anyhow::Result;
@@ -127,8 +129,14 @@ fn run_repl_loop(
     config: &mut Config,
     rpc_client: &mut RpcClient,
     print_commands: bool,
+    local_docker: bool,
     mut output_fn: OutputResultFn,
 ) -> anyhow::Result<Value, RpcClientError> {
+    if local_docker {
+        unsafe {
+            DOCKERFILE_IMAGE = DOCKERFILE_IMAGE_LOCAL;
+        }
+    }
     let mut println = |output_fn: &mut OutputResultFn, s: String| output_fn(Ok(Value::String(s)));
     println(&mut output_fn, "Welcome to vsl-cli REPL.".to_string());
     println(
@@ -273,11 +281,18 @@ pub fn exec_command(
         Commands::Repl {
             print_commands,
             tmp_config,
+            local_docker,
         } => {
             // Load the existing config in REPL mode
             let mut config = Configs::load(None, CliMode::MultiCommand)
                 .context("Failed to load a current config")?;
-            run_repl_loop(&mut config, &mut rpc_client, print_commands, output_fn);
+            run_repl_loop(
+                &mut config,
+                &mut rpc_client,
+                print_commands,
+                local_docker,
+                output_fn,
+            );
         }
         _ => {
             // Load the existing config in a single command mode

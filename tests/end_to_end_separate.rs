@@ -21,6 +21,11 @@ fn test_cli_end_to_end_separate() {
         println!("vsl-cli {}", line);
         let mut args = vec!["run".to_string(), "-p".to_string(), "vsl-cli".to_string()];
         args.extend(split_with_quotes(&line));
+        if let Ok(local_docker) = std::env::var("VSL_CLI_TEST_LOCAL_DOCKER") {
+            if line.starts_with("server:init") && local_docker == "1" {
+                args.push("--local-docker".to_string());
+            }
+        }
         let output = Command::new("cargo")
             .env("RUST_LOG", "info")
             .env("VSL_CLI_ERROR_PREFIX", error_prefix)

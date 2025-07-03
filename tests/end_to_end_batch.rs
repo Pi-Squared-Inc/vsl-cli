@@ -6,6 +6,8 @@ use std::process::Command;
 use std::thread;
 use std::time;
 
+use alloy::serde::quantity::vec;
+
 #[test]
 fn test_cli_end_to_end_batch() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -14,17 +16,23 @@ fn test_cli_end_to_end_batch() {
         .expect("Failed to open the batch command file");
     let error_prefix = "CLI Error";
     //let output = Command::new(dir.join("target").join("debug").join("vsl-cli"))
+    let mut args = vec![
+        "run".to_string(),
+        "-p".to_string(),
+        "vsl-cli".to_string(),
+        "repl".to_string(),
+        "--print-commands".to_string(),
+        "--tmp-config".to_string(),
+    ];
+    if let Ok(local_docker) = std::env::var("VSL_CLI_TEST_LOCAL_DOCKER") {
+        if local_docker == "1" {
+            args.push("--local-docker".to_string());
+        }
+    }
     let output = Command::new("cargo")
         .env("RUST_LOG", "info")
         .env("VSL_CLI_ERROR_PREFIX", error_prefix)
-        .args([
-            "run",
-            "-p",
-            "vsl-cli",
-            "repl",
-            "--print-commands",
-            "--tmp-config",
-        ])
+        .args(args)
         .stdin(batch_file)
         .output()
         .expect("failed to execute CLI batch file");
